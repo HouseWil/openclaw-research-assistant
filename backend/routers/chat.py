@@ -135,7 +135,7 @@ async def _openai_nonstream_with_tools(
         assistant_entry = {"role": "assistant", "content": msg.content or ""}
         tool_calls = msg.tool_calls or []
         if tool_calls:
-            current_signatures = [_tool_call_signature(tc) for tc in tool_calls]
+            current_signatures = sorted(_tool_call_signature(tc) for tc in tool_calls)
             if current_signatures == last_tool_signatures:
                 same_toolcall_rounds += 1
             else:
@@ -148,7 +148,6 @@ async def _openai_nonstream_with_tools(
                     messages=working_messages,
                     temperature=temperature,
                     max_tokens=max_tokens,
-                    tools=tools,
                     tool_choice="none",
                 )
                 forced_msg = forced_response.choices[0].message
