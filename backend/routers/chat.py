@@ -103,8 +103,9 @@ def _normalize_tool_args(raw: str) -> dict:
 
 
 def _tool_call_signature(tool_call) -> str:
-    name = tool_call.function.name if tool_call and tool_call.function else ""
-    args = _normalize_tool_args(tool_call.function.arguments if tool_call and tool_call.function else "")
+    func = tool_call.function if tool_call else None
+    name = func.name if func else ""
+    args = _normalize_tool_args(func.arguments if func else "")
     return f"{name}:{json.dumps(args, ensure_ascii=False, sort_keys=True)}"
 
 
@@ -143,6 +144,12 @@ async def _openai_nonstream_with_tools(
             last_tool_signatures = current_signatures
 
             if same_toolcall_rounds >= MAX_SAME_TOOLCALL_ROUNDS:
+                logger.warning(
+                    "tool_call_loop_detected model=%s rounds=%s tool_calls=%s",
+                    model,
+                    same_toolcall_rounds,
+                    current_signatures,
+                )
                 forced_response = await client.chat.completions.create(
                     model=model,
                     messages=working_messages,
