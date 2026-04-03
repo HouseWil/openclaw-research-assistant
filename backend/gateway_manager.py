@@ -18,6 +18,13 @@ logger = logging.getLogger(__name__)
 # Singleton process handle
 _gateway_process: Optional[subprocess.Popen] = None
 
+# Substrings that indicate the openclaw binary exited due to a stale lock file.
+_STALE_LOCK_MARKERS = ("already running", "lock timeout")
+
+# Seconds to wait after clearing a stale lock before retrying startup.
+# Gives the OS time to fully release any resources held by the previous process.
+_STALE_LOCK_RETRY_DELAY = 1.0
+
 
 def _get_gateway_url(cfg: dict) -> str:
     host = cfg.get("host", "127.0.0.1")
@@ -39,6 +46,28 @@ def is_running(cfg: dict) -> bool:
             return 200 <= resp.status_code < 300
     except Exception:
         return False
+
+
+def _try_clear_stale_lock(command: str) -> None:
+    """
+    Attempt to clear a stale gateway lock by running ``openclaw gateway stop``.
+
+    The openclaw binary maintains a lock/pid file to prevent duplicate
+    instances.  When a previous gateway process crashes without cleaning up,
+    the next ``openclaw gateway run`` invocation exits immediately with
+    "gateway already running; lock timeout".  Invoking ``openclaw gateway
+    stop`` removes the stale lock so the gateway can be started again.
+    """
+    try:
+        subprocess.run(
+            [command, "gateway", "stop"],
+            stdin=subprocess.DEVNULL,
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+            timeout=10,
+        )
+    except Exception:
+        pass
 
 
 def _resolve_command(command: str) -> str:
@@ -83,7 +112,17 @@ def start_gateway(cfg: dict) -> dict:
     """
     Start the OpenClaw Gateway as a subprocess (if not already running).
     Returns a dict with keys: success (bool), message (str).
+
+    If the openclaw binary exits immediately with a stale-lock error
+    ("gateway already running / lock timeout"), this function will
+    automatically run ``openclaw gateway stop`` to clear the lock and
+    retry once.
     """
+    return _start_gateway_impl(cfg, allow_stale_lock_retry=True)
+
+
+def _start_gateway_impl(cfg: dict, allow_stale_lock_retry: bool) -> dict:
+    """Internal implementation of gateway startup with optional stale-lock retry."""
     global _gateway_process
 
     if is_running(cfg):
@@ -112,6 +151,26 @@ def start_gateway(cfg: dict) -> dict:
     except Exception as exc:
         return {"success": False, "message": f"启动 Gateway 失败: {exc}"}
 
+    def _read_stderr() -> str:
+        try:
+            _, err = _gateway_process.communicate(timeout=1)
+            return err.decode(errors="replace") if err else ""
+        except Exception:
+            return ""
+
+    def _handle_unexpected_exit(stderr_text: str) -> dict:
+        """Handle early process exit; retry once on stale-lock errors."""
+        if allow_stale_lock_retry and any(m in stderr_text.lower() for m in _STALE_LOCK_MARKERS):
+            logger.warning(
+                "Gateway exited with a stale-lock error; running 'openclaw gateway stop' "
+                "to clear the lock and retrying. stderr: %s",
+                stderr_text.strip(),
+            )
+            _try_clear_stale_lock(command)
+            time.sleep(_STALE_LOCK_RETRY_DELAY)
+            return _start_gateway_impl(cfg, allow_stale_lock_retry=False)
+        return {"success": False, "message": f"Gateway 进程意外退出: {stderr_text[:200]}"}
+
     # Wait until the gateway is reachable
     deadline = time.monotonic() + timeout
     while time.monotonic() < deadline:
@@ -120,22 +179,10 @@ def start_gateway(cfg: dict) -> dict:
             # just transiently alive during initialisation.
             time.sleep(1.0)
             if _gateway_process.poll() is not None:
-                stderr_output = ""
-                try:
-                    _, err = _gateway_process.communicate(timeout=1)
-                    stderr_output = err.decode(errors="replace") if err else ""
-                except Exception:
-                    pass
-                return {"success": False, "message": f"Gateway 进程意外退出: {stderr_output[:200]}"}
+                return _handle_unexpected_exit(_read_stderr())
             return {"success": True, "message": "Gateway 已成功启动"}
         if _gateway_process.poll() is not None:
-            stderr_output = ""
-            try:
-                _, err = _gateway_process.communicate(timeout=1)
-                stderr_output = err.decode(errors="replace") if err else ""
-            except Exception:
-                pass
-            return {"success": False, "message": f"Gateway 进程意外退出: {stderr_output[:200]}"}
+            return _handle_unexpected_exit(_read_stderr())
         time.sleep(0.5)
 
     return {"success": False, "message": f"Gateway 在 {timeout} 秒内未能启动"}
