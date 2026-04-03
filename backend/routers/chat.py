@@ -28,6 +28,8 @@ router = APIRouter()
 SKILLS_PROMPT_HEADER = "\n\n可用技能（按需使用，优先遵守每个技能说明）："
 # Guardrail for tool loops to avoid runaway cost/latency and infinite recursion.
 MAX_TOOL_ROUNDS = 4
+# If model repeatedly requests the same tool calls, stop looping and force a final answer.
+MAX_SAME_TOOLCALL_ROUNDS = 1
 logger = logging.getLogger(__name__)
 
 
@@ -100,6 +102,13 @@ def _normalize_tool_args(raw: str) -> dict:
         return {}
 
 
+def _tool_call_signature(tool_call) -> str:
+    func = tool_call.function if tool_call else None
+    name = func.name if func else ""
+    args = _normalize_tool_args(func.arguments if func else "")
+    return f"{name}:{json.dumps(args, ensure_ascii=False, sort_keys=True)}"
+
+
 async def _openai_nonstream_with_tools(
     client,
     model: str,
@@ -111,6 +120,8 @@ async def _openai_nonstream_with_tools(
     skill_by_id = {s.get("id"): s for s in executable_skills}
     tools = [build_openai_tool(sk) for sk in executable_skills]
     working_messages = list(messages)
+    last_tool_signatures = None
+    same_toolcall_rounds = 0
 
     for _ in range(MAX_TOOL_ROUNDS):
         response = await client.chat.completions.create(
@@ -125,6 +136,30 @@ async def _openai_nonstream_with_tools(
         assistant_entry = {"role": "assistant", "content": msg.content or ""}
         tool_calls = msg.tool_calls or []
         if tool_calls:
+            current_signatures = sorted(_tool_call_signature(tc) for tc in tool_calls)
+            if current_signatures == last_tool_signatures:
+                same_toolcall_rounds += 1
+            else:
+                same_toolcall_rounds = 0
+            last_tool_signatures = current_signatures
+
+            if same_toolcall_rounds >= MAX_SAME_TOOLCALL_ROUNDS:
+                logger.warning(
+                    "tool_call_loop_detected model=%s rounds=%s tool_calls=%s",
+                    model,
+                    same_toolcall_rounds,
+                    current_signatures,
+                )
+                forced_response = await client.chat.completions.create(
+                    model=model,
+                    messages=working_messages,
+                    temperature=temperature,
+                    max_tokens=max_tokens,
+                    tool_choice="none",
+                )
+                forced_msg = forced_response.choices[0].message
+                return {"content": forced_msg.content or "", "model": model}
+
             assistant_entry["tool_calls"] = [
                 {
                     "id": tc.id,
