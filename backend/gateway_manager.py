@@ -89,7 +89,7 @@ def start_gateway(cfg: dict) -> dict:
     port = cfg.get("port", 18789)
     timeout = int(cfg.get("startup_timeout", 30))
 
-    cmd = [command, "gateway", "run", "--host", str(host), "--port", str(port)]
+    cmd = [command, "gateway", "run", "--port", str(port)]
     password = cfg.get("password", "")
     if password:
         cmd += ["--password", password]
