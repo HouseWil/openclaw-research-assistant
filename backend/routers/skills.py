@@ -96,6 +96,22 @@ def _normalize_skill_payload(payload: Dict[str, Any], fallback_id: str = "") -> 
         skill["enabled"] = True
     if not isinstance(skill.get("parameters"), dict):
         skill["parameters"] = {}
+    if "execution" in skill and not isinstance(skill.get("execution"), dict):
+        skill["execution"] = {}
+    execution = skill.get("execution")
+    if isinstance(execution, dict):
+        execution.setdefault("type", "http")
+        if execution.get("allowed_domains") is not None and not isinstance(execution.get("allowed_domains"), list):
+            execution["allowed_domains"] = []
+        if execution.get("headers") is not None and not isinstance(execution.get("headers"), dict):
+            execution["headers"] = {}
+        if execution.get("query") is not None and not isinstance(execution.get("query"), dict):
+            execution["query"] = {}
+        if execution.get("body") is not None and not isinstance(execution.get("body"), (dict, list, str, int, float, bool)):
+            execution["body"] = {}
+        skill["execution"] = execution
+    if "arg_schema" in skill and not isinstance(skill.get("arg_schema"), dict):
+        skill["arg_schema"] = {}
 
     return skill
 
