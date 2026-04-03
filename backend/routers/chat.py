@@ -28,6 +28,8 @@ router = APIRouter()
 SKILLS_PROMPT_HEADER = "\n\n可用技能（按需使用，优先遵守每个技能说明）："
 # Guardrail for tool loops to avoid runaway cost/latency and infinite recursion.
 MAX_TOOL_ROUNDS = 4
+# If model repeatedly requests the same tool calls, stop looping and force a final answer.
+MAX_SAME_TOOLCALL_ROUNDS = 1
 logger = logging.getLogger(__name__)
 
 
@@ -100,6 +102,12 @@ def _normalize_tool_args(raw: str) -> dict:
         return {}
 
 
+def _tool_call_signature(tool_call) -> str:
+    name = tool_call.function.name if tool_call and tool_call.function else ""
+    args = _normalize_tool_args(tool_call.function.arguments if tool_call and tool_call.function else "")
+    return f"{name}:{json.dumps(args, ensure_ascii=False, sort_keys=True)}"
+
+
 async def _openai_nonstream_with_tools(
     client,
     model: str,
@@ -111,6 +119,8 @@ async def _openai_nonstream_with_tools(
     skill_by_id = {s.get("id"): s for s in executable_skills}
     tools = [build_openai_tool(sk) for sk in executable_skills]
     working_messages = list(messages)
+    last_tool_signatures = None
+    same_toolcall_rounds = 0
 
     for _ in range(MAX_TOOL_ROUNDS):
         response = await client.chat.completions.create(
@@ -125,6 +135,25 @@ async def _openai_nonstream_with_tools(
         assistant_entry = {"role": "assistant", "content": msg.content or ""}
         tool_calls = msg.tool_calls or []
         if tool_calls:
+            current_signatures = [_tool_call_signature(tc) for tc in tool_calls]
+            if current_signatures == last_tool_signatures:
+                same_toolcall_rounds += 1
+            else:
+                same_toolcall_rounds = 0
+            last_tool_signatures = current_signatures
+
+            if same_toolcall_rounds >= MAX_SAME_TOOLCALL_ROUNDS:
+                forced_response = await client.chat.completions.create(
+                    model=model,
+                    messages=working_messages,
+                    temperature=temperature,
+                    max_tokens=max_tokens,
+                    tools=tools,
+                    tool_choice="none",
+                )
+                forced_msg = forced_response.choices[0].message
+                return {"content": forced_msg.content or "", "model": model}
+
             assistant_entry["tool_calls"] = [
                 {
                     "id": tc.id,
