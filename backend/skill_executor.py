@@ -171,8 +171,9 @@ async def execute_skill(skill: Dict[str, Any], args: Dict[str, Any]) -> Dict[str
     if not isinstance(execution, dict):
         raise SkillExecutionError(f"Skill '{skill_id}' has no execution config")
 
-    if str(execution.get("type") or "http").lower() != "http":
-        raise SkillExecutionError("Only execution.type=http is currently supported")
+    exec_type = str(execution.get("type") or "http")
+    if exec_type.lower() != "http":
+        raise SkillExecutionError(f"Unsupported execution.type '{exec_type}' (case-insensitive); only 'http' is supported")
 
     if not isinstance(args, dict):
         args = {}

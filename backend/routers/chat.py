@@ -170,7 +170,8 @@ async def _openai_nonstream_with_tools(
     return {
         "content": (
             f"Tool calling reached max rounds ({MAX_TOOL_ROUNDS}); "
-            "please simplify your request or break it into smaller steps and retry."
+            "the model repeatedly requested tools without finishing. "
+            "Please simplify your request or break it into smaller steps and retry."
         ),
         "model": model,
     }
