@@ -18,6 +18,7 @@ BASE_DIR = Path(__file__).parent.parent.parent
 CONFIG_DIR = BASE_DIR / "config"
 
 router = APIRouter()
+SKILLS_PROMPT_HEADER = "\n\n可用技能（按需使用，优先遵守每个技能说明）："
 
 
 def _get_llm_config():
@@ -57,7 +58,7 @@ def _build_skills_prompt(agent: dict) -> str:
     if not enabled_skills:
         return ""
 
-    sections = ["\n\n可用技能（按需使用，优先遵守每个技能说明）："]
+    sections = [SKILLS_PROMPT_HEADER]
     for sk in enabled_skills:
         header = f"- {sk.get('name') or sk.get('id')} ({sk.get('id')})"
         lines = [header]

@@ -69,12 +69,13 @@ def _to_skill_id(value: str) -> str:
 def _normalize_skill_payload(payload: Dict[str, Any], fallback_id: str = "") -> Dict[str, Any]:
     """Normalize skill payload to ensure required fields and markdown compatibility."""
     skill = dict(payload or {})
-    markdown = skill.get("markdown") or skill.get("raw_markdown") or ""
+    markdown = skill.get("markdown") or ""
     if isinstance(markdown, str) and markdown.strip():
         parsed = _parse_markdown_skill(markdown)
         # Frontmatter values apply only when field is missing from explicit form fields
         for k, v in parsed.items():
-            if k not in skill or skill.get(k) in ("", None, {}, []):
+            existing = skill.get(k)
+            if k not in skill or existing in ("", None) or existing == {} or existing == []:
                 skill[k] = v
         skill["markdown"] = markdown.strip()
 
