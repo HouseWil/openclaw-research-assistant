@@ -25,7 +25,8 @@
   @keyframes blink{50%{opacity:0}}
   .panel{display:none}
   #panel-chat.active{display:flex;flex-direction:column;flex:1;overflow:hidden}
-  #panel-config.active,#panel-skills.active,#panel-agents.active,#panel-about.active{display:block;overflow-y:auto;background:#f9fafb;flex:1}
+  #panel-config.active,#panel-skills.active,#panel-agents.active,#panel-about.active,#panel-gateway.active{display:block;overflow-y:auto;background:#f9fafb;flex:1}
+  #panel-gateway.active{display:flex;flex-direction:column;flex:1;overflow:hidden;background:#f9fafb}
   .oc-toggle{appearance:none;-webkit-appearance:none;width:2.5rem;height:1.25rem;background:#d1d5db;
     border-radius:9999px;cursor:pointer;position:relative;transition:background .2s;flex-shrink:0}
   .oc-toggle::before{content:'';position:absolute;width:1rem;height:1rem;background:white;
@@ -55,6 +56,9 @@
   <span id="status-badge" class="flex items-center gap-1.5 text-xs px-2.5 py-1 rounded-full bg-gray-100 text-gray-600">
     <span class="w-2 h-2 rounded-full bg-gray-400"></span>检查中...
   </span>
+  <span id="gateway-badge" class="hidden flex items-center gap-1.5 text-xs px-2.5 py-1 rounded-full bg-gray-100 text-gray-600">
+    <span class="w-2 h-2 rounded-full bg-gray-400"></span>Gateway...
+  </span>
 </header>
 
 <!-- Layout -->
@@ -77,6 +81,10 @@
     <button id="nav-agents" class="nav-item w-12 h-12 rounded-xl flex flex-col items-center justify-center gap-0.5 text-gray-500 hover:bg-blue-50 hover:text-blue-600 transition-all" data-panel="agents" title="智能体">
       <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 3H5a2 2 0 00-2 2v4m6-6h10a2 2 0 012 2v4M9 3v18m0 0h10a2 2 0 002-2V9M9 21H5a2 2 0 01-2-2V9m0 0h18"/></svg>
       <span class="text-[9px] font-medium">智能体</span>
+    </button>
+    <button id="nav-gateway" class="nav-item w-12 h-12 rounded-xl flex flex-col items-center justify-center gap-0.5 text-gray-500 hover:bg-blue-50 hover:text-blue-600 transition-all" data-panel="gateway" title="OpenClaw Chat">
+      <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 8h10M7 12h4m1 8l-4-4H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-3l-4 4z"/></svg>
+      <span class="text-[9px] font-medium">OC Chat</span>
     </button>
     <div class="flex-1"></div>
     <button id="nav-about"  class="nav-item w-12 h-12 rounded-xl flex flex-col items-center justify-center gap-0.5 text-gray-500 hover:bg-blue-50 hover:text-blue-600 transition-all" data-panel="about" title="关于">
@@ -198,6 +206,43 @@
           <button id="test-conn-btn" class="flex-1 border border-gray-200 hover:border-blue-300 hover:bg-blue-50 text-gray-700 rounded-xl px-4 py-2.5 text-sm font-medium transition-all">测试连接</button>
         </div>
         <p id="config-status" class="mt-3 text-sm text-center"></p>
+
+        <!-- Gateway 配置 -->
+        <div class="bg-white rounded-xl border border-gray-200 p-5 mt-4 shadow-sm">
+          <h3 class="font-semibold text-gray-800 mb-4 flex items-center gap-2">
+            <svg class="w-5 h-5 text-teal-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 8h10M7 12h4m1 8l-4-4H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-3l-4 4z"/></svg>Gateway 配置
+          </h3>
+          <div class="space-y-4">
+            <label class="flex items-center gap-2.5 cursor-pointer">
+              <input type="checkbox" id="cfg-gw-enabled" class="oc-toggle"><span class="text-sm text-gray-700">启用 OpenClaw Gateway 集成</span>
+            </label>
+            <label class="flex items-center gap-2.5 cursor-pointer">
+              <input type="checkbox" id="cfg-gw-auto-start" class="oc-toggle"><span class="text-sm text-gray-700">启动时自动启动 Gateway</span>
+            </label>
+            <div class="grid grid-cols-2 gap-4">
+              <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1.5">Gateway 主机</label>
+                <input type="text" id="cfg-gw-host" class="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500" placeholder="127.0.0.1">
+              </div>
+              <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1.5">Gateway 端口</label>
+                <input type="number" id="cfg-gw-port" class="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm" placeholder="18789" min="1" max="65535">
+              </div>
+            </div>
+            <div>
+              <label class="block text-sm font-medium text-gray-700 mb-1.5">Gateway 密码 <span class="text-gray-400 font-normal">(留空表示无密码)</span></label>
+              <input type="password" id="cfg-gw-password" class="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500" placeholder="留空表示无密码">
+            </div>
+            <div>
+              <label class="block text-sm font-medium text-gray-700 mb-1.5">Gateway 命令 <span class="text-gray-400 font-normal">(或完整路径)</span></label>
+              <input type="text" id="cfg-gw-command" class="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500" placeholder="openclaw">
+            </div>
+            <div class="flex gap-3">
+              <button id="save-gw-config-btn" class="flex-1 bg-teal-600 hover:bg-teal-700 text-white rounded-xl px-4 py-2.5 text-sm font-medium transition-all">保存 Gateway 配置</button>
+            </div>
+            <p id="gw-config-status" class="text-sm text-center"></p>
+          </div>
+        </div>
       </div>
     </div>
 
@@ -230,6 +275,33 @@
           </button>
         </div>
         <div id="agents-list" class="space-y-3"><div class="text-center text-gray-400 py-8">加载中…</div></div>
+      </div>
+    </div>
+
+    <!-- GATEWAY / OpenClaw Chat -->
+    <div id="panel-gateway" class="panel">
+      <div class="border-b border-gray-100 px-4 py-2.5 flex items-center gap-3 bg-white flex-shrink-0">
+        <div class="flex items-center gap-2">
+          <span id="gw-panel-dot" class="w-2.5 h-2.5 rounded-full bg-gray-300 flex-shrink-0"></span>
+          <span id="gw-panel-label" class="text-sm font-medium text-gray-700">OpenClaw Gateway</span>
+        </div>
+        <div class="flex-1"></div>
+        <button id="gw-start-btn" class="hidden text-xs bg-blue-600 hover:bg-blue-700 text-white px-3 py-1.5 rounded-lg transition-all">启动 Gateway</button>
+        <button id="gw-stop-btn" class="hidden text-xs border border-gray-200 hover:border-red-300 hover:text-red-600 text-gray-600 px-3 py-1.5 rounded-lg transition-all">停止 Gateway</button>
+        <button id="gw-refresh-btn" class="text-xs border border-gray-200 hover:bg-gray-50 text-gray-500 px-3 py-1.5 rounded-lg transition-all">刷新状态</button>
+      </div>
+      <div id="gw-iframe-wrap" class="flex-1 relative">
+        <iframe id="gw-iframe" class="w-full h-full border-none" src="about:blank" title="OpenClaw WebChat"></iframe>
+        <div id="gw-placeholder" class="absolute inset-0 flex flex-col items-center justify-center bg-gray-50 gap-4">
+          <div class="w-16 h-16 bg-blue-100 rounded-2xl flex items-center justify-center">
+            <svg class="w-8 h-8 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 8h10M7 12h4m1 8l-4-4H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-3l-4 4z"/></svg>
+          </div>
+          <div class="text-center">
+            <p class="text-gray-700 font-semibold text-base mb-1">OpenClaw WebChat</p>
+            <p id="gw-placeholder-msg" class="text-sm text-gray-500">正在检查 Gateway 状态…</p>
+          </div>
+          <div id="gw-placeholder-actions" class="flex gap-2"></div>
+        </div>
       </div>
     </div>
 
@@ -291,12 +363,13 @@
 </div>
 
 <script>
-const S = { chatHistory:[], config:{}, skills:[], agents:[], streaming:false, modalMode:null, modalTarget:null };
+const S = { chatHistory:[], config:{}, skills:[], agents:[], streaming:false, modalMode:null, modalTarget:null, gatewayStatus:{} };
 
 document.addEventListener('DOMContentLoaded', async () => {
-  bindNav(); bindChat(); bindConfig(); bindSkills(); bindAgents(); bindModal();
+  bindNav(); bindChat(); bindConfig(); bindSkills(); bindAgents(); bindModal(); bindGateway();
   await Promise.all([loadConfig(), loadSkills(), loadAgents()]);
   checkStatus(); populateAgentSelector(); populateModelSelector();
+  checkGatewayStatus();
 });
 
 // NAV
@@ -311,6 +384,7 @@ function showPanel(name) {
   if (name === 'config') fillConfigForm();
   if (name === 'skills') renderSkills();
   if (name === 'agents') renderAgents();
+  if (name === 'gateway') { checkGatewayStatus(); }
 }
 
 // CHAT
@@ -416,7 +490,7 @@ function bindConfig() {
 }
 async function loadConfig() { try { const r = await fetch('/api/config/'); if (r.ok) S.config = await r.json(); } catch(e) {} }
 function fillConfigForm() {
-  const llm = S.config.llm || {}, ui = S.config.ui || {};
+  const llm = S.config.llm || {}, ui = S.config.ui || {}, gw = S.config.gateway || {};
   setVal('cfg-provider', llm.provider || 'openai'); setVal('cfg-api-base', llm.api_base || '');
   setVal('cfg-model', llm.model || 'gpt-4o'); setVal('cfg-temperature', llm.temperature ?? 0.7);
   setVal('cfg-max-tokens', llm.max_tokens || 2048); setVal('cfg-language', ui.language || 'zh-CN');
@@ -424,6 +498,13 @@ function fillConfigForm() {
   const mk = llm.api_key_masked;
   document.getElementById('cfg-api-key-current').textContent = mk ? ('当前 Key: ' + mk) : '未设置 API Key';
   onProviderChange(llm.provider || 'openai');
+  # Gateway config fields
+  const gwEnabledEl = document.getElementById('cfg-gw-enabled'); if (gwEnabledEl) gwEnabledEl.checked = !!gw.enabled;
+  const gwAutoEl = document.getElementById('cfg-gw-auto-start'); if (gwAutoEl) gwAutoEl.checked = !!gw.auto_start;
+  setVal('cfg-gw-host', gw.host || '127.0.0.1');
+  setVal('cfg-gw-port', gw.port || 18789);
+  setVal('cfg-gw-password', gw.password || '');
+  setVal('cfg-gw-command', gw.openclaw_command || 'openclaw');
 }
 function onProviderChange(p) {
   const g = document.getElementById('cfg-api-base-group');
@@ -721,7 +802,128 @@ function closeModal() {
   S.modalMode = null; S.modalTarget = null;
 }
 
-// API HELPERS
+// GATEWAY
+function bindGateway() {
+  document.getElementById('gw-start-btn').addEventListener('click', startGateway);
+  document.getElementById('gw-stop-btn').addEventListener('click', stopGateway);
+  document.getElementById('gw-refresh-btn').addEventListener('click', checkGatewayStatus);
+  document.getElementById('save-gw-config-btn').addEventListener('click', saveGatewayConfig);
+}
+
+async function checkGatewayStatus() {
+  try {
+    const r = await fetch('/api/gateway/status');
+    if (!r.ok) return;
+    const d = await r.json();
+    S.gatewayStatus = d;
+    updateGatewayUI(d);
+  } catch(e) {}
+}
+
+function updateGatewayUI(d) {
+  const running = d.running;
+  const dot = document.getElementById('gw-panel-dot');
+  const label = document.getElementById('gw-panel-label');
+  const startBtn = document.getElementById('gw-start-btn');
+  const stopBtn = document.getElementById('gw-stop-btn');
+  const placeholder = document.getElementById('gw-placeholder');
+  const iframe = document.getElementById('gw-iframe');
+  const placeholderMsg = document.getElementById('gw-placeholder-msg');
+  const placeholderActions = document.getElementById('gw-placeholder-actions');
+  const badge = document.getElementById('gateway-badge');
+
+  // Update header badge
+  const gwCfg = S.config.gateway || {};
+  if (gwCfg.enabled) {
+    badge.classList.remove('hidden');
+    if (running) {
+      badge.innerHTML = '<span class="w-2 h-2 rounded-full bg-teal-400"></span> Gateway 已连接';
+      badge.className = 'flex items-center gap-1.5 text-xs px-2.5 py-1 rounded-full bg-teal-50 text-teal-600';
+    } else {
+      badge.innerHTML = '<span class="w-2 h-2 rounded-full bg-orange-400"></span> Gateway 未连接';
+      badge.className = 'flex items-center gap-1.5 text-xs px-2.5 py-1 rounded-full bg-orange-50 text-orange-600';
+    }
+  } else {
+    badge.classList.add('hidden');
+  }
+
+  // Update panel toolbar
+  if (dot) { dot.className = 'w-2.5 h-2.5 rounded-full flex-shrink-0 ' + (running ? 'bg-teal-400' : 'bg-gray-300'); }
+  if (label) label.textContent = 'OpenClaw Gateway — ' + (running ? '已连接 (' + d.url + ')' : '未连接');
+  if (startBtn) startBtn.classList.toggle('hidden', running);
+  if (stopBtn) stopBtn.classList.toggle('hidden', !d.managed);
+
+  if (running) {
+    if (placeholder) placeholder.style.display = 'none';
+    if (iframe) { if (iframe.src !== d.url) iframe.src = d.url; }
+  } else {
+    if (placeholder) placeholder.style.display = '';
+    if (iframe) iframe.src = 'about:blank';
+    const gwCfgEnabled = (S.config.gateway || {}).enabled;
+    if (placeholderMsg) placeholderMsg.textContent = gwCfgEnabled ? 'OpenClaw Gateway 未运行，请启动后使用' : '请先在"配置"中启用 OpenClaw Gateway 集成';
+    if (placeholderActions) {
+      placeholderActions.innerHTML = '';
+      if (gwCfgEnabled) {
+        const btn = document.createElement('button');
+        btn.className = 'text-sm bg-teal-600 hover:bg-teal-700 text-white px-4 py-2 rounded-lg transition-all';
+        btn.textContent = '启动 Gateway';
+        btn.addEventListener('click', startGateway);
+        placeholderActions.appendChild(btn);
+      } else {
+        const btn = document.createElement('button');
+        btn.className = 'text-sm border border-gray-200 hover:bg-gray-50 text-gray-600 px-4 py-2 rounded-lg transition-all';
+        btn.textContent = '前往配置';
+        btn.addEventListener('click', () => showPanel('config'));
+        placeholderActions.appendChild(btn);
+      }
+    }
+  }
+}
+
+async function startGateway() {
+  const btn = document.getElementById('gw-start-btn'); if (btn) { btn.disabled = true; btn.textContent = '启动中…'; }
+  try {
+    const r = await fetch('/api/gateway/start', { method: 'POST' });
+    const d = await r.json();
+    if (!r.ok) throw new Error(d.detail || '启动失败');
+    toast('✅ ' + d.message);
+    await checkGatewayStatus();
+  } catch(e) { toast('❌ ' + e.message, true); }
+  finally { if (btn) { btn.disabled = false; btn.textContent = '启动 Gateway'; } }
+}
+
+async function stopGateway() {
+  const btn = document.getElementById('gw-stop-btn'); if (btn) { btn.disabled = true; btn.textContent = '停止中…'; }
+  try {
+    const r = await fetch('/api/gateway/stop', { method: 'POST' });
+    const d = await r.json();
+    if (!r.ok) throw new Error(d.detail || '停止失败');
+    toast('✅ ' + d.message);
+    await checkGatewayStatus();
+  } catch(e) { toast('❌ ' + e.message, true); }
+  finally { if (btn) { btn.disabled = false; btn.textContent = '停止 Gateway'; } }
+}
+
+async function saveGatewayConfig() {
+  const enabled = document.getElementById('cfg-gw-enabled')?.checked || false;
+  const auto_start = document.getElementById('cfg-gw-auto-start')?.checked || false;
+  const host = getVal('cfg-gw-host') || '127.0.0.1';
+  const port = parseInt(getVal('cfg-gw-port')) || 18789;
+  const password = getVal('cfg-gw-password');
+  const openclaw_command = getVal('cfg-gw-command') || 'openclaw';
+  const body = { enabled, auto_start, host, port, openclaw_command };
+  if (password) body.password = password;
+  try {
+    const r = await fetch('/api/gateway/config', { method: 'PUT', headers: {'Content-Type':'application/json'}, body: JSON.stringify(body) });
+    if (!r.ok) throw new Error(await r.text());
+    await loadConfig(); fillConfigForm();
+    setStatus('gw-config-status', '✅ Gateway 配置已保存', 'teal');
+    toast('✅ Gateway 配置已保存');
+    checkGatewayStatus();
+  } catch(e) { toast('❌ ' + e.message, true); }
+}
+
+
 async function apiPut(url, body) { const r = await fetch(url, { method:'PUT', headers:{'Content-Type':'application/json'}, body:JSON.stringify(body) }); if (!r.ok) { const d = await r.json().catch(() => ({})); throw new Error(d.detail || 'HTTP ' + r.status); } return r.json(); }
 async function apiPost(url, body) { const r = await fetch(url, { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(body) }); if (!r.ok) { const d = await r.json().catch(() => ({})); throw new Error(d.detail || 'HTTP ' + r.status); } return r.json(); }
 async function apiDel(url) { const r = await fetch(url, { method:'DELETE' }); if (!r.ok) { const d = await r.json().catch(() => ({})); throw new Error(d.detail || 'HTTP ' + r.status); } return r.json(); }
