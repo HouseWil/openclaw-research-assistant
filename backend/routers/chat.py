@@ -166,7 +166,7 @@ async def _openai_nonstream_with_tools(
                 }
             )
 
-    return {"content": f"工具调用已达到最大轮次({MAX_TOOL_ROUNDS}次)，请缩小问题范围后重试。", "model": model}
+    return {"content": f"Tool calling reached max rounds ({MAX_TOOL_ROUNDS}); please narrow your request and retry.", "model": model}
 
 
 async def _stream_openai(client, model: str, messages: list, temperature: float, max_tokens: int) -> AsyncGenerator[str, None]:
@@ -272,6 +272,8 @@ async def chat(request: ChatRequest):
                 kwargs["base_url"] = api_base
             client = AsyncOpenAI(**kwargs)
 
+            # Current tool loop is implemented in non-stream mode to ensure
+            # deterministic tool_call -> execute -> tool_result round trips.
             if do_stream and not executable_skills:
                 return StreamingResponse(
                     _stream_openai(client, model, messages, temperature, max_tokens),

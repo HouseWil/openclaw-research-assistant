@@ -546,7 +546,7 @@ function openSkillModal(skill) {
       </div>
       <div class="grid grid-cols-2 gap-3">
         <div>
-          <label class="block text-xs font-medium text-gray-600 mb-1">执行类型</label>
+          <label class="block text-xs font-medium text-gray-600 mb-1">执行类型 <span class="text-gray-400">(当前仅支持 http)</span></label>
           <select id="m-skill-exec-type" class="w-full border border-gray-200 rounded-lg px-2.5 py-2 text-xs bg-white">
             <option value="http" ${executionType === 'http' ? 'selected' : ''}>http</option>
           </select>
@@ -648,6 +648,13 @@ function mkParamRow(k, v) {
   return '<div class="param-row flex gap-2 items-center"><input type="text" class="param-key flex-1 border border-gray-200 rounded-lg px-2.5 py-1.5 text-xs font-mono focus:ring-2 focus:ring-blue-500" placeholder="参数名" value="' + esc(k) + '"><span class="text-gray-400 text-xs flex-shrink-0">:</span><input type="text" class="param-val flex-1 border border-gray-200 rounded-lg px-2.5 py-1.5 text-xs font-mono focus:ring-2 focus:ring-blue-500" placeholder="参数值" value="' + esc(v) + '"><button type="button" class="param-del-btn flex-shrink-0 text-gray-400 hover:text-red-500 transition-colors"><svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg></button></div>';
 }
 
+const SKILL_JSON_FIELD_NAME_MAP = {
+  'm-skill-exec-headers': '执行配置 - Headers',
+  'm-skill-exec-query': '执行配置 - Query',
+  'm-skill-exec-body': '执行配置 - Body',
+  'm-skill-arg-schema': '参数 Schema',
+};
+
 function collectParams() {
   const params = {};
   document.querySelectorAll('.param-row').forEach(row => {
@@ -665,15 +672,9 @@ async function submitSkillForm() {
   if (!id || !name) { toast('❌ ID 和名称不能为空', true); return; }
   if (S.modalMode === 'add-skill' && !/^[a-zA-Z0-9_]+$/.test(id)) { toast('❌ ID 仅限英文、数字和下划线', true); return; }
   const parseJsonField = (fieldId, fallback) => {
-    const fieldNameMap = {
-      'm-skill-exec-headers': '执行配置 - Headers',
-      'm-skill-exec-query': '执行配置 - Query',
-      'm-skill-exec-body': '执行配置 - Body',
-      'm-skill-arg-schema': '参数 Schema',
-    };
     const raw = document.getElementById(fieldId)?.value?.trim() || '';
     if (!raw) return fallback;
-    try { return JSON.parse(raw); } catch (e) { throw new Error((fieldNameMap[fieldId] || fieldId) + ' 不是合法 JSON'); }
+    try { return JSON.parse(raw); } catch (e) { throw new Error((SKILL_JSON_FIELD_NAME_MAP[fieldId] || fieldId) + ' 不是合法 JSON'); }
   };
   let headers = {};
   let query = {};

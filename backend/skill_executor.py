@@ -111,6 +111,8 @@ def build_openai_tool(skill: Dict[str, Any]) -> Dict[str, Any]:
         raise ValueError("Skill id is required")
 
     arg_schema = skill.get("arg_schema")
+    # Keep validation lightweight here: enforce object/properties shape only.
+    # Full JSON Schema validation is intentionally omitted for compatibility.
     has_valid_schema = isinstance(arg_schema, dict) and isinstance(arg_schema.get("properties"), dict)
     if not has_valid_schema:
         params = skill.get("parameters") if isinstance(skill.get("parameters"), dict) else {}
@@ -162,7 +164,7 @@ async def execute_skill(skill: Dict[str, Any], args: Dict[str, Any]) -> Dict[str
     _validate_tool_args(args)
 
     method = str(execution.get("method") or "GET").upper()
-    endpoint_tpl = execution.get("endpoint") or execution.get("url")
+    endpoint_tpl = execution.get("endpoint")
     if not endpoint_tpl:
         raise SkillExecutionError("Skill execution endpoint is required")
     endpoint = _render_template(endpoint_tpl, args)
