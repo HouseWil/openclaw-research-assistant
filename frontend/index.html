@@ -808,6 +808,7 @@ function bindGateway() {
   document.getElementById('gw-stop-btn').addEventListener('click', stopGateway);
   document.getElementById('gw-refresh-btn').addEventListener('click', checkGatewayStatus);
   document.getElementById('save-gw-config-btn').addEventListener('click', saveGatewayConfig);
+  setInterval(checkGatewayStatus, 5000);
 }
 
 async function checkGatewayStatus() {

@@ -110,6 +110,17 @@ def start_gateway(cfg: dict) -> dict:
     deadline = time.monotonic() + timeout
     while time.monotonic() < deadline:
         if is_running(cfg):
+            # Brief stabilisation pause: confirm the gateway stays up and is not
+            # just transiently alive during initialisation.
+            time.sleep(1.0)
+            if _gateway_process.poll() is not None:
+                stderr_output = ""
+                try:
+                    _, err = _gateway_process.communicate(timeout=1)
+                    stderr_output = err.decode(errors="replace") if err else ""
+                except Exception:
+                    pass
+                return {"success": False, "message": f"Gateway 进程意外退出: {stderr_output[:200]}"}
             return {"success": True, "message": "Gateway 已成功启动"}
         if _gateway_process.poll() is not None:
             stderr_output = ""
