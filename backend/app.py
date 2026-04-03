@@ -14,8 +14,7 @@ from contextlib import asynccontextmanager
 sys.path.insert(0, str(Path(__file__).parent))
 
 from config_manager import ConfigManager
-from routers import chat, config, skills, agents, gateway
-import gateway_manager
+from routers import chat, config, skills, agents
 
 BASE_DIR = Path(__file__).parent.parent
 FRONTEND_DIR = BASE_DIR / "frontend"
@@ -28,14 +27,7 @@ async def lifespan(app: FastAPI):
     config_mgr = ConfigManager(CONFIG_DIR)
     config_mgr.ensure_defaults()
 
-    # Auto-start Gateway if configured
-    gateway_cfg = config_mgr.get_openclaw_config().get("gateway", {})
-    await gateway_manager.auto_start_if_configured(gateway_cfg)
-
     yield
-
-    # Graceful shutdown: stop managed Gateway process
-    gateway_manager.stop_gateway()
 
 
 app = FastAPI(
@@ -50,7 +42,6 @@ app.include_router(chat.router, prefix="/api/chat", tags=["chat"])
 app.include_router(config.router, prefix="/api/config", tags=["config"])
 app.include_router(skills.router, prefix="/api/skills", tags=["skills"])
 app.include_router(agents.router, prefix="/api/agents", tags=["agents"])
-app.include_router(gateway.router, prefix="/api/gateway", tags=["gateway"])
 
 # Serve frontend static files
 if FRONTEND_DIR.exists():
