@@ -4,6 +4,7 @@ Gateway Manager - manages the local OpenClaw Gateway process lifecycle.
 
 import asyncio
 import logging
+import shutil
 import subprocess
 import sys
 import time
@@ -35,6 +36,44 @@ def is_running(cfg: dict) -> bool:
         return False
 
 
+def _resolve_command(command: str) -> str:
+    """
+    Resolve a command name to its full executable path.
+
+    When the web server's PATH differs from the user's interactive shell PATH
+    (e.g. the binary is installed inside a virtual-environment that the web
+    process did not activate), ``subprocess.Popen`` would raise
+    ``FileNotFoundError`` even though the command works fine in a terminal.
+
+    Resolution order:
+    1. If *command* is already an absolute path, use it as-is.
+    2. ``shutil.which()`` searches the PATH inherited by the current process.
+    3. The ``bin/`` (or ``Scripts/`` on Windows) directory that contains the
+       running Python interpreter – covers venv / pipx installs.
+    4. Fall back to the original *command* string and let the OS report the
+       error with a meaningful message.
+    """
+    # Already absolute – trust the caller.
+    if Path(command).is_absolute():
+        return command
+
+    # Standard PATH lookup.
+    found = shutil.which(command)
+    if found:
+        return found
+
+    # Same directory as the current Python interpreter (handles venv installs).
+    python_bin_dir = Path(sys.executable).parent
+    exe_suffix = ".exe" if sys.platform == "win32" else ""
+    cmd_name = command if command.lower().endswith(exe_suffix) else command + exe_suffix
+    candidate = python_bin_dir / cmd_name
+    if candidate.is_file():
+        return str(candidate)
+
+    # Give up – return the original name so the OS error message is helpful.
+    return command
+
+
 def start_gateway(cfg: dict) -> dict:
     """
     Start the OpenClaw Gateway as a subprocess (if not already running).
@@ -45,7 +84,7 @@ def start_gateway(cfg: dict) -> dict:
     if is_running(cfg):
         return {"success": True, "message": "Gateway 已经在运行中"}
 
-    command = cfg.get("openclaw_command", "openclaw")
+    command = _resolve_command(cfg.get("openclaw_command", "openclaw"))
     host = cfg.get("host", "127.0.0.1")
     port = cfg.get("port", 18789)
     timeout = int(cfg.get("startup_timeout", 30))
