@@ -26,6 +26,7 @@ CONFIG_DIR = BASE_DIR / "config"
 
 router = APIRouter()
 SKILLS_PROMPT_HEADER = "\n\n可用技能（按需使用，优先遵守每个技能说明）："
+# Guardrail for tool loops to avoid runaway cost/latency and infinite recursion.
 MAX_TOOL_ROUNDS = 4
 logger = logging.getLogger(__name__)
 
@@ -156,7 +157,7 @@ async def _openai_nonstream_with_tools(
                     tool_output = json.dumps({"ok": False, "error": str(exc)}, ensure_ascii=False)
                 except Exception as exc:
                     logger.exception("tool_execution_unexpected tool=%s", skill_id)
-                    tool_output = json.dumps({"ok": False, "error": type(exc).__name__}, ensure_ascii=False)
+                    tool_output = json.dumps({"ok": False, "error": "Tool execution failed"}, ensure_ascii=False)
 
             working_messages.append(
                 {

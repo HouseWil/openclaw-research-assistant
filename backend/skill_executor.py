@@ -6,6 +6,8 @@ from __future__ import annotations
 
 import json
 import logging
+import os
+import re
 import time
 from typing import Any, Dict, List
 from urllib.parse import urlparse
@@ -18,6 +20,15 @@ logger = logging.getLogger(__name__)
 DEFAULT_ALLOWED_DOMAINS = {"wttr.in", "api.open-meteo.com"}
 MAX_RESULT_CHARS = 4000
 MAX_ARG_CHARS = 500
+_SAFE_TOKEN_RE = re.compile(r"\{([a-zA-Z0-9_]+)\}")
+
+
+def _env_allowed_domains() -> set[str]:
+    raw = os.getenv("OPENCLAW_ALLOWED_SKILL_DOMAINS", "")
+    if not raw.strip():
+        return set(DEFAULT_ALLOWED_DOMAINS)
+    domains = {x.strip().lower() for x in raw.split(",") if x.strip()}
+    return domains if domains else set(DEFAULT_ALLOWED_DOMAINS)
 
 
 class SkillExecutionError(Exception):
@@ -47,10 +58,12 @@ def _truncate(text: str, limit: int = MAX_RESULT_CHARS) -> str:
 
 def _render_template(value: Any, args: Dict[str, Any]) -> Any:
     if isinstance(value, str):
-        try:
-            return value.format(**args)
-        except Exception:
-            return value
+        def _replace(m):
+            key = m.group(1)
+            if key in args:
+                return str(args[key])
+            return m.group(0)
+        return _SAFE_TOKEN_RE.sub(_replace, value)
     if isinstance(value, dict):
         return {k: _render_template(v, args) for k, v in value.items()}
     if isinstance(value, list):
@@ -90,7 +103,7 @@ def _get_allowed_domains(execution: Dict[str, Any]) -> set[str]:
         cleaned = {str(x).strip().lower() for x in configured if str(x).strip()}
         if cleaned:
             return cleaned
-    return set(DEFAULT_ALLOWED_DOMAINS)
+    return _env_allowed_domains()
 
 
 def _validate_target(url: str, allowed_domains: set[str]) -> None:
