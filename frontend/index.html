@@ -498,7 +498,7 @@ function fillConfigForm() {
   const mk = llm.api_key_masked;
   document.getElementById('cfg-api-key-current').textContent = mk ? ('当前 Key: ' + mk) : '未设置 API Key';
   onProviderChange(llm.provider || 'openai');
-  # Gateway config fields
+  // Gateway config fields
   const gwEnabledEl = document.getElementById('cfg-gw-enabled'); if (gwEnabledEl) gwEnabledEl.checked = !!gw.enabled;
   const gwAutoEl = document.getElementById('cfg-gw-auto-start'); if (gwAutoEl) gwAutoEl.checked = !!gw.auto_start;
   setVal('cfg-gw-host', gw.host || '127.0.0.1');
