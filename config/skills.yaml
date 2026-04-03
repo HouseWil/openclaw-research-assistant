@@ -1,0 +1,38 @@
+skills:
+- id: web_search
+  name: 网络搜索
+  description: 搜索互联网获取最新信息
+  enabled: false
+  parameters:
+    search_engine: google
+    max_results: '5'
+- id: paper_reader
+  name: 论文阅读
+  description: 解析和总结学术论文
+  enabled: true
+  parameters:
+    supported_formats:
+    - pdf
+    - arxiv
+    summary_length: medium
+- id: code_executor
+  name: 代码执行
+  description: 执行 Python 代码片段
+  enabled: false
+  parameters:
+    timeout: 30
+    allowed_libraries:
+    - numpy
+    - pandas
+    - matplotlib
+- id: citation_manager
+  name: 引用管理
+  description: 管理和格式化学术引用
+  enabled: true
+  parameters:
+    default_style: APA
+    supported_styles:
+    - APA
+    - MLA
+    - Chicago
+    - IEEE

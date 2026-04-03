@@ -1,0 +1,741 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>OpenClaw 科研助手</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<style>
+  ::-webkit-scrollbar{width:6px;height:6px}
+  ::-webkit-scrollbar-track{background:#f1f1f1}
+  ::-webkit-scrollbar-thumb{background:#c1c1c1;border-radius:3px}
+  ::-webkit-scrollbar-thumb:hover{background:#a8a8a8}
+  @keyframes fadeIn{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
+  .msg-enter{animation:fadeIn .25s ease}
+  .nav-item.active{background-color:#eff6ff;color:#2563eb}
+  .chat-content code{background:#f3f4f6;padding:1px 4px;border-radius:3px;font-size:.85em;font-family:monospace}
+  .chat-content pre{background:#1e293b;color:#e2e8f0;padding:12px;border-radius:6px;overflow-x:auto;margin:8px 0}
+  .chat-content pre code{background:none;color:inherit;padding:0}
+  .chat-content p{margin-bottom:.5em}
+  .chat-content ul,.chat-content ol{padding-left:1.5em;margin-bottom:.5em}
+  .chat-content li{margin-bottom:.25em}
+  .chat-content strong{font-weight:600}
+  .chat-content h1,.chat-content h2,.chat-content h3{font-weight:600;margin:.5em 0 .25em}
+  .cursor-blink::after{content:'▊';animation:blink .7s step-end infinite}
+  @keyframes blink{50%{opacity:0}}
+  .panel{display:none}
+  #panel-chat.active{display:flex;flex-direction:column;flex:1;overflow:hidden}
+  #panel-config.active,#panel-skills.active,#panel-agents.active,#panel-about.active{display:block;overflow-y:auto;background:#f9fafb;flex:1}
+  .oc-toggle{appearance:none;-webkit-appearance:none;width:2.5rem;height:1.25rem;background:#d1d5db;
+    border-radius:9999px;cursor:pointer;position:relative;transition:background .2s;flex-shrink:0}
+  .oc-toggle::before{content:'';position:absolute;width:1rem;height:1rem;background:white;
+    border-radius:50%;top:.125rem;left:.125rem;transition:transform .2s;box-shadow:0 1px 3px rgba(0,0,0,.2)}
+  .oc-toggle:checked{background:#2563eb}
+  .oc-toggle:checked::before{transform:translateX(1.25rem)}
+  #modal-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:50;
+    align-items:center;justify-content:center;padding:1rem}
+  #modal-overlay.open{display:flex}
+</style>
+</head>
+<body class="bg-gray-50 h-screen flex flex-col overflow-hidden">
+
+<!-- Header -->
+<header class="bg-white border-b border-gray-200 px-4 py-3 flex items-center justify-between flex-shrink-0 shadow-sm">
+  <div class="flex items-center gap-3">
+    <div class="w-8 h-8 bg-blue-600 rounded-lg flex items-center justify-center">
+      <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.347.347a3.5 3.5 0 00-1.023 2.47A5.501 5.501 0 0112 21a5.501 5.501 0 01-5.38-4.547 3.5 3.5 0 00-1.023-2.47l-.347-.347z"/>
+      </svg>
+    </div>
+    <div>
+      <h1 class="text-lg font-bold text-gray-900">OpenClaw 科研助手</h1>
+      <p class="text-xs text-gray-500">打造属于你自己的科研小龙虾</p>
+    </div>
+  </div>
+  <span id="status-badge" class="flex items-center gap-1.5 text-xs px-2.5 py-1 rounded-full bg-gray-100 text-gray-600">
+    <span class="w-2 h-2 rounded-full bg-gray-400"></span>检查中...
+  </span>
+</header>
+
+<!-- Layout -->
+<div class="flex flex-1 overflow-hidden">
+
+  <!-- Sidebar -->
+  <nav class="w-16 bg-white border-r border-gray-200 flex flex-col items-center py-4 gap-2 flex-shrink-0 shadow-sm">
+    <button id="nav-chat"   class="nav-item active w-12 h-12 rounded-xl flex flex-col items-center justify-center gap-0.5 text-gray-500 hover:bg-blue-50 hover:text-blue-600 transition-all" data-panel="chat" title="对话">
+      <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"/></svg>
+      <span class="text-[9px] font-medium">对话</span>
+    </button>
+    <button id="nav-config" class="nav-item w-12 h-12 rounded-xl flex flex-col items-center justify-center gap-0.5 text-gray-500 hover:bg-blue-50 hover:text-blue-600 transition-all" data-panel="config" title="配置">
+      <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
+      <span class="text-[9px] font-medium">配置</span>
+    </button>
+    <button id="nav-skills" class="nav-item w-12 h-12 rounded-xl flex flex-col items-center justify-center gap-0.5 text-gray-500 hover:bg-blue-50 hover:text-blue-600 transition-all" data-panel="skills" title="技能">
+      <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
+      <span class="text-[9px] font-medium">技能</span>
+    </button>
+    <button id="nav-agents" class="nav-item w-12 h-12 rounded-xl flex flex-col items-center justify-center gap-0.5 text-gray-500 hover:bg-blue-50 hover:text-blue-600 transition-all" data-panel="agents" title="智能体">
+      <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 3H5a2 2 0 00-2 2v4m6-6h10a2 2 0 012 2v4M9 3v18m0 0h10a2 2 0 002-2V9M9 21H5a2 2 0 01-2-2V9m0 0h18"/></svg>
+      <span class="text-[9px] font-medium">智能体</span>
+    </button>
+    <div class="flex-1"></div>
+    <button id="nav-about"  class="nav-item w-12 h-12 rounded-xl flex flex-col items-center justify-center gap-0.5 text-gray-500 hover:bg-blue-50 hover:text-blue-600 transition-all" data-panel="about" title="关于">
+      <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+      <span class="text-[9px] font-medium">关于</span>
+    </button>
+  </nav>
+
+  <!-- Content -->
+  <div class="flex-1 overflow-hidden flex">
+
+    <!-- CHAT -->
+    <div id="panel-chat" class="panel active bg-white">
+      <div class="border-b border-gray-100 px-4 py-2 flex items-center gap-3 bg-gray-50 flex-shrink-0">
+        <label class="text-xs text-gray-500 font-medium">智能体:</label>
+        <select id="agent-selector" class="text-sm border border-gray-200 rounded-lg px-2.5 py-1.5 bg-white focus:ring-2 focus:ring-blue-500">
+          <option value="">默认 (全局配置)</option>
+        </select>
+        <label class="text-xs text-gray-500 font-medium">模型:</label>
+        <select id="model-selector" class="text-sm border border-gray-200 rounded-lg px-2.5 py-1.5 bg-white focus:ring-2 focus:ring-blue-500">
+          <option value="">默认</option>
+        </select>
+        <div class="flex-1"></div>
+        <button id="clear-chat-btn" class="text-xs text-gray-500 hover:text-red-500 flex items-center gap-1 px-2 py-1 rounded hover:bg-red-50 transition-all">
+          <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>清空对话
+        </button>
+      </div>
+      <div id="messages" class="flex-1 overflow-y-auto p-4 space-y-4">
+        <div id="welcome-screen" class="flex justify-center">
+          <div class="text-center py-8 max-w-md">
+            <div class="w-16 h-16 bg-blue-100 rounded-2xl flex items-center justify-center mx-auto mb-4">
+              <svg class="w-8 h-8 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.347.347a3.5 3.5 0 00-1.023 2.47A5.501 5.501 0 0112 21a5.501 5.501 0 01-5.38-4.547 3.5 3.5 0 00-1.023-2.47l-.347-.347z"/></svg>
+            </div>
+            <h2 class="text-xl font-bold text-gray-800 mb-2">欢迎使用 OpenClaw 科研助手</h2>
+            <p class="text-gray-500 text-sm leading-relaxed">我可以帮助您进行文献调研、论文写作、数据分析等科研工作。</p>
+            <div class="mt-4 flex flex-wrap gap-2 justify-center">
+              <button class="quick-msg text-xs bg-blue-50 text-blue-600 px-3 py-1.5 rounded-full hover:bg-blue-100 transition-all" data-msg="请帮我解释机器学习中的注意力机制">🧠 解释注意力机制</button>
+              <button class="quick-msg text-xs bg-purple-50 text-purple-600 px-3 py-1.5 rounded-full hover:bg-purple-100 transition-all" data-msg="如何写一篇好的科研论文摘要？">📝 论文摘要写作</button>
+              <button class="quick-msg text-xs bg-green-50 text-green-600 px-3 py-1.5 rounded-full hover:bg-green-100 transition-all" data-msg="推荐几个常用的科研数据库和文献检索工具">📚 文献数据库</button>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="border-t border-gray-200 p-4 bg-white flex-shrink-0">
+        <div class="flex gap-3 items-end max-w-4xl mx-auto">
+          <textarea id="chat-input" class="flex-1 border border-gray-200 rounded-2xl px-4 py-3 text-sm resize-none focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none leading-relaxed" placeholder="输入您的问题… (Shift+Enter 换行，Enter 发送)" rows="1" style="min-height:44px;max-height:128px"></textarea>
+          <button id="send-btn" class="flex-shrink-0 bg-blue-600 hover:bg-blue-700 text-white rounded-2xl px-4 py-3 text-sm font-medium transition-all flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8"/></svg>发送
+          </button>
+        </div>
+        <p class="text-center text-xs text-gray-400 mt-2">AI 生成内容仅供参考，请自行判断其准确性</p>
+      </div>
+    </div>
+
+    <!-- CONFIG -->
+    <div id="panel-config" class="panel">
+      <div class="max-w-2xl mx-auto p-6">
+        <h2 class="text-xl font-bold text-gray-900 mb-1">系统配置</h2>
+        <p class="text-sm text-gray-500 mt-1 mb-5">配置 AI 模型 API 和全局设置</p>
+        <div class="bg-white rounded-xl border border-gray-200 p-5 mb-4 shadow-sm">
+          <h3 class="font-semibold text-gray-800 mb-4 flex items-center gap-2">
+            <svg class="w-5 h-5 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>大模型配置
+          </h3>
+          <div class="space-y-4">
+            <div>
+              <label class="block text-sm font-medium text-gray-700 mb-1.5">模型提供商</label>
+              <select id="cfg-provider" class="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500">
+                <option value="openai">OpenAI</option>
+                <option value="anthropic">Anthropic (Claude)</option>
+                <option value="custom">自定义 (OpenAI 兼容)</option>
+              </select>
+            </div>
+            <div>
+              <label class="block text-sm font-medium text-gray-700 mb-1.5">API Key</label>
+              <div class="relative">
+                <input type="password" id="cfg-api-key" class="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 pr-16" placeholder="输入新 API Key（留空保持不变）">
+                <button id="toggle-key-vis" class="absolute right-2 top-1/2 -translate-y-1/2 text-xs text-gray-400 hover:text-gray-600 px-1">显示</button>
+              </div>
+              <p id="cfg-api-key-current" class="text-xs text-gray-400 mt-1"></p>
+            </div>
+            <div id="cfg-api-base-group">
+              <label class="block text-sm font-medium text-gray-700 mb-1.5">API Base URL <span class="text-gray-400 font-normal">(可选，用于本地模型或代理)</span></label>
+              <input type="text" id="cfg-api-base" class="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500" placeholder="如: http://localhost:11434/v1">
+            </div>
+            <div>
+              <label class="block text-sm font-medium text-gray-700 mb-1.5">默认模型</label>
+              <input type="text" id="cfg-model" class="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500" placeholder="如: gpt-4o">
+            </div>
+            <div class="grid grid-cols-2 gap-4">
+              <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1.5">Temperature <span class="text-gray-400">(0-2)</span></label>
+                <input type="number" id="cfg-temperature" class="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm" placeholder="0.7" min="0" max="2" step="0.1">
+              </div>
+              <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1.5">Max Tokens</label>
+                <input type="number" id="cfg-max-tokens" class="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm" placeholder="2048" min="1">
+              </div>
+            </div>
+            <label class="flex items-center gap-2.5 cursor-pointer">
+              <input type="checkbox" id="cfg-stream" class="oc-toggle"><span class="text-sm text-gray-700">启用流式输出</span>
+            </label>
+          </div>
+        </div>
+        <div class="bg-white rounded-xl border border-gray-200 p-5 mb-4 shadow-sm">
+          <h3 class="font-semibold text-gray-800 mb-4 flex items-center gap-2">
+            <svg class="w-5 h-5 text-purple-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>界面设置
+          </h3>
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1.5">语言</label>
+            <select id="cfg-language" class="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500">
+              <option value="zh-CN">中文 (简体)</option>
+              <option value="zh-TW">中文 (繁體)</option>
+              <option value="en">English</option>
+            </select>
+          </div>
+        </div>
+        <div class="flex gap-3">
+          <button id="save-config-btn" class="flex-1 bg-blue-600 hover:bg-blue-700 text-white rounded-xl px-4 py-2.5 text-sm font-medium transition-all">保存配置</button>
+          <button id="test-conn-btn" class="flex-1 border border-gray-200 hover:border-blue-300 hover:bg-blue-50 text-gray-700 rounded-xl px-4 py-2.5 text-sm font-medium transition-all">测试连接</button>
+        </div>
+        <p id="config-status" class="mt-3 text-sm text-center"></p>
+      </div>
+    </div>
+
+    <!-- SKILLS -->
+    <div id="panel-skills" class="panel">
+      <div class="max-w-2xl mx-auto p-6">
+        <div class="mb-5 flex items-center justify-between">
+          <div>
+            <h2 class="text-xl font-bold text-gray-900">技能配置</h2>
+            <p class="text-sm text-gray-500 mt-1">管理智能体可以使用的能力模块</p>
+          </div>
+          <button id="add-skill-btn" class="bg-blue-600 hover:bg-blue-700 text-white rounded-xl px-3 py-2 text-sm font-medium flex items-center gap-1.5 transition-all">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>添加技能
+          </button>
+        </div>
+        <div id="skills-list" class="space-y-3"><div class="text-center text-gray-400 py-8">加载中…</div></div>
+      </div>
+    </div>
+
+    <!-- AGENTS -->
+    <div id="panel-agents" class="panel">
+      <div class="max-w-2xl mx-auto p-6">
+        <div class="mb-5 flex items-center justify-between">
+          <div>
+            <h2 class="text-xl font-bold text-gray-900">智能体配置</h2>
+            <p class="text-sm text-gray-500 mt-1">配置专门用途的 AI 智能体</p>
+          </div>
+          <button id="add-agent-btn" class="bg-blue-600 hover:bg-blue-700 text-white rounded-xl px-3 py-2 text-sm font-medium flex items-center gap-1.5 transition-all">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>添加智能体
+          </button>
+        </div>
+        <div id="agents-list" class="space-y-3"><div class="text-center text-gray-400 py-8">加载中…</div></div>
+      </div>
+    </div>
+
+    <!-- ABOUT -->
+    <div id="panel-about" class="panel">
+      <div class="max-w-lg mx-auto p-6">
+        <div class="text-center py-8">
+          <div class="w-20 h-20 bg-blue-100 rounded-3xl flex items-center justify-center mx-auto mb-6">
+            <svg class="w-10 h-10 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.347.347a3.5 3.5 0 00-1.023 2.47A5.501 5.501 0 0112 21a5.501 5.501 0 01-5.38-4.547 3.5 3.5 0 00-1.023-2.47l-.347-.347z"/></svg>
+          </div>
+          <h2 class="text-2xl font-bold text-gray-900 mb-2">OpenClaw 科研助手</h2>
+          <p class="text-gray-500 mb-1">打造属于你自己的科研小龙虾</p>
+          <p class="text-sm text-gray-400 mb-8">版本 1.0.0</p>
+          <div class="space-y-4 text-left">
+            <div class="bg-white rounded-xl border border-gray-200 p-4 shadow-sm">
+              <h3 class="font-semibold text-gray-800 mb-2">功能介绍</h3>
+              <ul class="space-y-2 text-sm text-gray-600">
+                <li class="flex items-start gap-2"><span class="text-blue-500 mt-0.5">💬</span><span>基于大模型 API 的智能对话，支持流式输出</span></li>
+                <li class="flex items-start gap-2"><span class="text-blue-500 mt-0.5">🤖</span><span>多个专业智能体，针对不同科研场景优化</span></li>
+                <li class="flex items-start gap-2"><span class="text-blue-500 mt-0.5">⚡</span><span>可扩展的技能模块，增强 AI 能力</span></li>
+                <li class="flex items-start gap-2"><span class="text-blue-500 mt-0.5">⚙️</span><span>完整的配置管理，支持多种模型提供商</span></li>
+              </ul>
+            </div>
+            <div class="bg-white rounded-xl border border-gray-200 p-4 shadow-sm">
+              <h3 class="font-semibold text-gray-800 mb-2">支持的模型提供商</h3>
+              <div class="flex flex-wrap gap-2">
+                <span class="bg-green-50 text-green-700 text-xs px-2.5 py-1 rounded-full font-medium">OpenAI</span>
+                <span class="bg-orange-50 text-orange-700 text-xs px-2.5 py-1 rounded-full font-medium">Anthropic Claude</span>
+                <span class="bg-blue-50 text-blue-700 text-xs px-2.5 py-1 rounded-full font-medium">Ollama (本地)</span>
+                <span class="bg-purple-50 text-purple-700 text-xs px-2.5 py-1 rounded-full font-medium">LM Studio</span>
+                <span class="bg-gray-50 text-gray-700 text-xs px-2.5 py-1 rounded-full font-medium">任意 OpenAI 兼容 API</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<!-- MODAL -->
+<div id="modal-overlay" aria-modal="true" role="dialog">
+  <div id="modal-box" class="bg-white rounded-2xl shadow-2xl w-full max-w-lg max-h-[90vh] flex flex-col overflow-hidden">
+    <div class="flex items-center justify-between px-6 py-4 border-b border-gray-100 flex-shrink-0">
+      <h3 id="modal-title" class="text-lg font-bold text-gray-900"></h3>
+      <button id="modal-close-x" class="text-gray-400 hover:text-gray-600 transition-colors">
+        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+      </button>
+    </div>
+    <div id="modal-body" class="overflow-y-auto p-6 flex-1"></div>
+    <div id="modal-footer" class="flex gap-3 px-6 py-4 border-t border-gray-100 flex-shrink-0"></div>
+  </div>
+</div>
+
+<!-- Toast -->
+<div id="toast" class="hidden fixed bottom-6 right-6 z-[60] flex items-center gap-3 text-white px-4 py-3 rounded-xl shadow-lg text-sm max-w-sm bg-gray-900">
+  <span id="toast-msg"></span>
+</div>
+
+<script>
+const S = { chatHistory:[], config:{}, skills:[], agents:[], streaming:false, modalMode:null, modalTarget:null };
+
+document.addEventListener('DOMContentLoaded', async () => {
+  bindNav(); bindChat(); bindConfig(); bindSkills(); bindAgents(); bindModal();
+  await Promise.all([loadConfig(), loadSkills(), loadAgents()]);
+  checkStatus(); populateAgentSelector(); populateModelSelector();
+});
+
+// NAV
+function bindNav() {
+  document.querySelectorAll('[data-panel]').forEach(btn => btn.addEventListener('click', () => showPanel(btn.dataset.panel)));
+}
+function showPanel(name) {
+  document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('[data-panel]').forEach(b => b.classList.remove('active'));
+  document.getElementById('panel-' + name).classList.add('active');
+  document.getElementById('nav-' + name).classList.add('active');
+  if (name === 'config') fillConfigForm();
+  if (name === 'skills') renderSkills();
+  if (name === 'agents') renderAgents();
+}
+
+// CHAT
+function bindChat() {
+  document.getElementById('send-btn').addEventListener('click', sendMessage);
+  document.getElementById('clear-chat-btn').addEventListener('click', clearChat);
+  const inp = document.getElementById('chat-input');
+  inp.addEventListener('keydown', e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMessage(); } });
+  inp.addEventListener('input', () => { inp.style.height = 'auto'; inp.style.height = Math.min(inp.scrollHeight, 128) + 'px'; });
+  document.querySelectorAll('.quick-msg').forEach(b => b.addEventListener('click', () => { document.getElementById('chat-input').value = b.dataset.msg; sendMessage(); }));
+}
+
+async function sendMessage() {
+  if (S.streaming) return;
+  const inp = document.getElementById('chat-input');
+  const text = inp.value.trim();
+  if (!text) return;
+  inp.value = ''; inp.style.height = 'auto';
+  const agentId = document.getElementById('agent-selector').value;
+  const model = document.getElementById('model-selector').value;
+  document.getElementById('welcome-screen')?.remove();
+  S.chatHistory.push({ role:'user', content:text });
+  appendMsg('user', text);
+  const assistId = 'msg-' + Date.now();
+  appendMsg('assistant', '', assistId);
+  S.streaming = true; document.getElementById('send-btn').disabled = true;
+  try {
+    const body = { messages: S.chatHistory.map(m => ({ role:m.role, content:m.content })) };
+    if (agentId) body.agent_id = agentId;
+    if (model) body.model = model;
+    const res = await fetch('/api/chat/', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(body) });
+    if (!res.ok) { const e = await res.json(); throw new Error(e.detail || '请求失败'); }
+    const ct = res.headers.get('content-type') || '';
+    let full = '';
+    const msgEl = document.getElementById(assistId);
+    const contentEl = msgEl?.querySelector('.chat-content');
+    if (ct.includes('text/event-stream')) {
+      if (contentEl) contentEl.classList.add('cursor-blink');
+      const reader = res.body.getReader(); const dec = new TextDecoder();
+      while (true) {
+        const { done, value } = await reader.read(); if (done) break;
+        for (const line of dec.decode(value).split('\n')) {
+          if (!line.startsWith('data: ')) continue;
+          try {
+            const d = JSON.parse(line.slice(6));
+            if (d.error) throw new Error(d.error);
+            if (d.content) { full += d.content; if (contentEl) { contentEl.innerHTML = fmtMsg(full); scrollBottom(); } }
+            if (d.done && contentEl) contentEl.classList.remove('cursor-blink');
+          } catch(e2) { if (e2.message !== 'Unexpected end of JSON input') throw e2; }
+        }
+      }
+    } else { const d = await res.json(); full = d.content; if (contentEl) contentEl.innerHTML = fmtMsg(full); }
+    S.chatHistory.push({ role:'assistant', content:full }); scrollBottom();
+  } catch(e) {
+    const msgEl = document.getElementById(assistId); const c = msgEl?.querySelector('.chat-content');
+    if (c) { c.classList.remove('cursor-blink'); c.innerHTML = '<span class="text-red-500">⚠️ ' + esc(e.message) + '</span>'; }
+    toast('❌ ' + e.message, true);
+  } finally { S.streaming = false; document.getElementById('send-btn').disabled = false; inp.focus(); }
+}
+
+function appendMsg(role, content, id) {
+  const isUser = role === 'user';
+  const el = document.createElement('div');
+  el.className = 'flex gap-3 msg-enter ' + (isUser ? 'justify-end' : 'justify-start');
+  if (id) el.id = id;
+  if (isUser) {
+    el.innerHTML = '<div class="max-w-[75%]"><div class="bg-blue-600 text-white px-4 py-3 rounded-2xl rounded-tr-sm text-sm leading-relaxed">' + esc(content) + '</div></div><div class="w-8 h-8 bg-blue-100 rounded-full flex-shrink-0 flex items-center justify-center text-blue-600 font-bold text-xs">我</div>';
+  } else {
+    el.innerHTML = '<div class="w-8 h-8 bg-gradient-to-br from-blue-500 to-purple-600 rounded-full flex-shrink-0 flex items-center justify-center"><svg class="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.347.347a3.5 3.5 0 00-1.023 2.47A5.501 5.501 0 0112 21a5.501 5.501 0 01-5.38-4.547 3.5 3.5 0 00-1.023-2.47l-.347-.347z"/></svg></div><div class="max-w-[75%]"><div class="bg-white border border-gray-200 px-4 py-3 rounded-2xl rounded-tl-sm text-sm leading-relaxed shadow-sm"><div class="chat-content">' + (content ? fmtMsg(content) : '<span class="text-gray-300">…</span>') + '</div></div></div>';
+  }
+  document.getElementById('messages').appendChild(el); scrollBottom();
+}
+
+function clearChat() {
+  S.chatHistory = []; const m = document.getElementById('messages'); m.innerHTML = '';
+  const w = document.createElement('div'); w.id = 'welcome-screen'; w.className = 'flex justify-center';
+  w.innerHTML = '<div class="text-center py-8 max-w-md"><div class="w-16 h-16 bg-blue-100 rounded-2xl flex items-center justify-center mx-auto mb-4"><svg class="w-8 h-8 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.347.347a3.5 3.5 0 00-1.023 2.47A5.501 5.501 0 0112 21a5.501 5.501 0 01-5.38-4.547 3.5 3.5 0 00-1.023-2.47l-.347-.347z"/></svg></div><h2 class="text-xl font-bold text-gray-800 mb-2">对话已清空</h2><p class="text-gray-500 text-sm">选择智能体，开始新的对话吧！</p></div>';
+  m.appendChild(w);
+}
+
+function scrollBottom() { const m = document.getElementById('messages'); m.scrollTop = m.scrollHeight; }
+function fmtMsg(t) {
+  return t.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
+    .replace(/```(\w*)\n?([\s\S]*?)```/g,(_,l,c)=>'<pre><code>'+c.trim()+'</code></pre>')
+    .replace(/`([^`]+)`/g,'<code>$1</code>')
+    .replace(/\*\*(.+?)\*\*/g,'<strong>$1</strong>').replace(/\*(.+?)\*/g,'<em>$1</em>')
+    .replace(/^### (.+)$/gm,'<h3>$1</h3>').replace(/^## (.+)$/gm,'<h2>$1</h2>').replace(/^# (.+)$/gm,'<h1>$1</h1>')
+    .replace(/^- (.+)$/gm,'<li>$1</li>').replace(/(<li>.*<\/li>\n?)+/g,m=>'<ul>'+m+'</ul>')
+    .replace(/\n\n/g,'</p><p>').replace(/\n/g,'<br>');
+}
+function esc(s) { return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+
+// CONFIG
+function bindConfig() {
+  document.getElementById('cfg-provider').addEventListener('change', e => onProviderChange(e.target.value));
+  document.getElementById('toggle-key-vis').addEventListener('click', () => {
+    const inp = document.getElementById('cfg-api-key');
+    inp.type = inp.type === 'password' ? 'text' : 'password';
+    document.getElementById('toggle-key-vis').textContent = inp.type === 'password' ? '显示' : '隐藏';
+  });
+  document.getElementById('save-config-btn').addEventListener('click', saveConfig);
+  document.getElementById('test-conn-btn').addEventListener('click', testConn);
+}
+async function loadConfig() { try { const r = await fetch('/api/config/'); if (r.ok) S.config = await r.json(); } catch(e) {} }
+function fillConfigForm() {
+  const llm = S.config.llm || {}, ui = S.config.ui || {};
+  setVal('cfg-provider', llm.provider || 'openai'); setVal('cfg-api-base', llm.api_base || '');
+  setVal('cfg-model', llm.model || 'gpt-4o'); setVal('cfg-temperature', llm.temperature ?? 0.7);
+  setVal('cfg-max-tokens', llm.max_tokens || 2048); setVal('cfg-language', ui.language || 'zh-CN');
+  const streamEl = document.getElementById('cfg-stream'); if (streamEl) streamEl.checked = llm.stream !== false;
+  const mk = llm.api_key_masked;
+  document.getElementById('cfg-api-key-current').textContent = mk ? ('当前 Key: ' + mk) : '未设置 API Key';
+  onProviderChange(llm.provider || 'openai');
+}
+function onProviderChange(p) {
+  const g = document.getElementById('cfg-api-base-group');
+  if (g) g.style.display = p === 'anthropic' ? 'none' : 'block';
+}
+async function saveConfig() {
+  const apiKey = getVal('cfg-api-key');
+  const data = { llm:{ provider:getVal('cfg-provider'), api_base:getVal('cfg-api-base'), model:getVal('cfg-model'), temperature:parseFloat(getVal('cfg-temperature'))||0.7, max_tokens:parseInt(getVal('cfg-max-tokens'))||2048, stream:document.getElementById('cfg-stream')?.checked!==false }, ui:{ language:getVal('cfg-language') } };
+  if (apiKey) data.llm.api_key = apiKey;
+  try {
+    const r = await fetch('/api/config/', { method:'PUT', headers:{'Content-Type':'application/json'}, body:JSON.stringify({data}) });
+    if (!r.ok) throw new Error(await r.text());
+    await loadConfig(); fillConfigForm(); checkStatus(); document.getElementById('cfg-api-key').value = '';
+    setStatus('config-status', '✅ 配置保存成功', 'green'); toast('✅ 配置已保存');
+  } catch(e) { toast('❌ ' + e.message, true); }
+}
+async function testConn() {
+  const btn = document.getElementById('test-conn-btn'); btn.disabled = true; btn.textContent = '测试中…';
+  try {
+    const r = await fetch('/api/config/test-connection', { method:'POST' }); const d = await r.json();
+    if (r.ok) { toast('✅ ' + d.message); setStatus('config-status', '✅ ' + d.message, 'green'); }
+    else throw new Error(d.detail || '连接失败');
+  } catch(e) { toast('❌ ' + e.message, true); setStatus('config-status', '❌ ' + e.message, 'red'); }
+  finally { btn.disabled = false; btn.textContent = '测试连接'; }
+}
+async function checkStatus() {
+  const b = document.getElementById('status-badge'); await loadConfig();
+  const mk = S.config.llm?.api_key_masked;
+  if (mk) { b.innerHTML = '<span class="w-2 h-2 rounded-full bg-green-400"></span> API 已配置'; b.className = 'flex items-center gap-1.5 text-xs px-2.5 py-1 rounded-full bg-green-50 text-green-600'; }
+  else { b.innerHTML = '<span class="w-2 h-2 rounded-full bg-yellow-400"></span> 未配置 API Key'; b.className = 'flex items-center gap-1.5 text-xs px-2.5 py-1 rounded-full bg-yellow-50 text-yellow-600'; }
+}
+function populateModelSelector() {
+  fetch('/api/chat/models').then(r => r.ok ? r.json() : null).then(d => {
+    if (!d) return;
+    const sel = document.getElementById('model-selector'); const def = sel.querySelector('option[value=""]');
+    sel.innerHTML = ''; sel.appendChild(def);
+    d.models.forEach(m => { const o = document.createElement('option'); o.value = m.id; o.textContent = m.name; if (m.id === d.current_model) o.selected = true; sel.appendChild(o); });
+  }).catch(() => {});
+}
+
+// SKILLS
+function bindSkills() { document.getElementById('add-skill-btn').addEventListener('click', () => openSkillModal(null)); }
+async function loadSkills() { try { const r = await fetch('/api/skills/'); if (r.ok) S.skills = (await r.json()).skills || []; } catch(e) {} }
+function renderSkills() {
+  const c = document.getElementById('skills-list');
+  if (!S.skills.length) { c.innerHTML = '<div class="text-center text-gray-400 py-8">暂无技能，点击"添加技能"创建第一个技能</div>'; return; }
+  c.innerHTML = S.skills.map(sk => `
+    <div class="bg-white rounded-xl border border-gray-200 p-4 shadow-sm hover:shadow-md transition-shadow">
+      <div class="flex items-start justify-between gap-3">
+        <div class="flex-1 min-w-0">
+          <div class="flex items-center gap-2 mb-1 flex-wrap">
+            <h3 class="font-semibold text-gray-800">${esc(sk.name)}</h3>
+            <span class="text-xs px-2 py-0.5 rounded-full ${sk.enabled ? 'bg-green-50 text-green-600' : 'bg-gray-100 text-gray-500'}">${sk.enabled ? '已启用' : '已禁用'}</span>
+          </div>
+          <p class="text-sm text-gray-500">${esc(sk.description || '')}</p>
+          <p class="text-xs text-gray-400 mt-1 font-mono">ID: ${esc(sk.id)}</p>
+          ${Object.keys(sk.parameters || {}).length ? '<div class="mt-2 flex flex-wrap gap-1">' + Object.entries(sk.parameters).map(([k,v]) => '<span class="text-xs bg-gray-50 text-gray-500 px-2 py-0.5 rounded font-mono">' + esc(k) + ': ' + esc(String(v)) + '</span>').join('') + '</div>' : ''}
+        </div>
+        <div class="flex items-center gap-1 flex-shrink-0">
+          <button class="skill-edit-btn text-xs text-blue-600 hover:text-blue-700 px-2 py-1 rounded hover:bg-blue-50 transition-all" data-id="${esc(sk.id)}">编辑</button>
+          <button class="skill-toggle-btn text-xs ${sk.enabled ? 'text-orange-600 hover:text-orange-700' : 'text-green-600 hover:text-green-700'} px-2 py-1 rounded hover:bg-gray-50 transition-all" data-id="${esc(sk.id)}" data-enabled="${sk.enabled}">${sk.enabled ? '禁用' : '启用'}</button>
+          <button class="skill-del-btn text-xs text-red-500 hover:text-red-600 px-2 py-1 rounded hover:bg-red-50 transition-all" data-id="${esc(sk.id)}">删除</button>
+        </div>
+      </div>
+    </div>`).join('');
+  c.querySelectorAll('.skill-edit-btn').forEach(b => b.addEventListener('click', () => openSkillModal(S.skills.find(s => s.id === b.dataset.id))));
+  c.querySelectorAll('.skill-toggle-btn').forEach(b => b.addEventListener('click', async () => {
+    const sk = S.skills.find(s => s.id === b.dataset.id); if (!sk) return;
+    const enabled = b.dataset.enabled !== 'true';
+    await apiPut('/api/skills/' + sk.id, { skill: Object.assign({}, sk, { enabled }) });
+    await loadSkills(); renderSkills(); populateAgentSelector(); toast('✅ 技能已' + (enabled ? '启用' : '禁用'));
+  }));
+  c.querySelectorAll('.skill-del-btn').forEach(b => b.addEventListener('click', async () => {
+    if (!confirm('确定删除技能 "' + b.dataset.id + '" 吗？')) return;
+    await apiDel('/api/skills/' + b.dataset.id); await loadSkills(); renderSkills(); populateAgentSelector(); toast('✅ 技能已删除');
+  }));
+}
+
+function openSkillModal(skill) {
+  S.modalMode = skill ? 'edit-skill' : 'add-skill'; S.modalTarget = skill?.id || null;
+  const wrap = document.createElement('div'); wrap.className = 'space-y-4';
+  const params = skill?.parameters || {};
+  const pRows = Object.entries(params).map(([k,v]) => mkParamRow(k, String(v))).join('');
+  wrap.innerHTML = `
+    <div class="grid grid-cols-2 gap-4">
+      <div>
+        <label class="block text-sm font-medium text-gray-700 mb-1.5">技能 ID <span class="text-red-500">*</span></label>
+        <input id="m-skill-id" type="text" class="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 ${skill ? 'bg-gray-50 cursor-not-allowed' : ''}" value="${esc(skill?.id||'')}" ${skill ? 'readonly' : ''} placeholder="如: my_skill">
+        <p class="text-xs text-gray-400 mt-1">仅限英文、数字和下划线</p>
+      </div>
+      <div>
+        <label class="block text-sm font-medium text-gray-700 mb-1.5">技能名称 <span class="text-red-500">*</span></label>
+        <input id="m-skill-name" type="text" class="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500" value="${esc(skill?.name||'')}" placeholder="如: 网络搜索">
+      </div>
+    </div>
+    <div>
+      <label class="block text-sm font-medium text-gray-700 mb-1.5">描述</label>
+      <textarea id="m-skill-desc" class="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500" rows="2" placeholder="技能的功能描述">${esc(skill?.description||'')}</textarea>
+    </div>
+    <div>
+      <div class="flex items-center justify-between mb-2">
+        <label class="text-sm font-medium text-gray-700">参数配置 <span class="text-gray-400 font-normal">(键值对)</span></label>
+        <button id="add-param-btn" type="button" class="text-xs text-blue-600 hover:text-blue-700 flex items-center gap-1 px-2 py-1 rounded hover:bg-blue-50 transition-all">
+          <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>添加参数
+        </button>
+      </div>
+      <div id="params-container" class="space-y-2 min-h-[2rem]">
+        ${pRows || '<p class="text-xs text-gray-400 text-center py-2 empty-hint">暂无参数，点击右上角添加</p>'}
+      </div>
+    </div>
+    <label class="flex items-center gap-2.5 cursor-pointer">
+      <input id="m-skill-enabled" type="checkbox" class="oc-toggle" ${skill?.enabled !== false ? 'checked' : ''}><span class="text-sm text-gray-700">启用此技能</span>
+    </label>`;
+  openModal(skill ? '编辑技能' : '添加技能', wrap, [
+    { label:'取消', cls:'border border-gray-200 text-gray-700 hover:bg-gray-50', action: closeModal },
+    { label: skill ? '保存更改' : '创建技能', cls:'bg-blue-600 hover:bg-blue-700 text-white', action: submitSkillForm },
+  ]);
+  // bind add param
+  document.getElementById('add-param-btn').addEventListener('click', () => {
+    const c = document.getElementById('params-container');
+    c.querySelector('.empty-hint')?.remove();
+    const div = document.createElement('div'); div.innerHTML = mkParamRow('', '');
+    const row = div.firstElementChild; c.appendChild(row);
+    row.querySelector('.param-del-btn').addEventListener('click', () => { row.remove(); if (!c.querySelectorAll('.param-row').length) c.innerHTML = '<p class="text-xs text-gray-400 text-center py-2 empty-hint">暂无参数，点击右上角添加</p>'; });
+    row.querySelector('.param-key').focus();
+  });
+  // bind existing delete buttons
+  document.querySelectorAll('.param-del-btn').forEach(btn => btn.addEventListener('click', () => {
+    const row = btn.closest('.param-row'); row.remove();
+    const c = document.getElementById('params-container');
+    if (!c.querySelectorAll('.param-row').length) c.innerHTML = '<p class="text-xs text-gray-400 text-center py-2 empty-hint">暂无参数，点击右上角添加</p>';
+  }));
+}
+
+function mkParamRow(k, v) {
+  return '<div class="param-row flex gap-2 items-center"><input type="text" class="param-key flex-1 border border-gray-200 rounded-lg px-2.5 py-1.5 text-xs font-mono focus:ring-2 focus:ring-blue-500" placeholder="参数名" value="' + esc(k) + '"><span class="text-gray-400 text-xs flex-shrink-0">:</span><input type="text" class="param-val flex-1 border border-gray-200 rounded-lg px-2.5 py-1.5 text-xs font-mono focus:ring-2 focus:ring-blue-500" placeholder="参数值" value="' + esc(v) + '"><button type="button" class="param-del-btn flex-shrink-0 text-gray-400 hover:text-red-500 transition-colors"><svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg></button></div>';
+}
+
+function collectParams() {
+  const params = {};
+  document.querySelectorAll('.param-row').forEach(row => {
+    const k = row.querySelector('.param-key')?.value?.trim(); const v = row.querySelector('.param-val')?.value?.trim();
+    if (k) params[k] = v || '';
+  });
+  return params;
+}
+
+async function submitSkillForm() {
+  const id = document.getElementById('m-skill-id')?.value?.trim();
+  const name = document.getElementById('m-skill-name')?.value?.trim();
+  if (!id || !name) { toast('❌ ID 和名称不能为空', true); return; }
+  if (S.modalMode === 'add-skill' && !/^[a-zA-Z0-9_]+$/.test(id)) { toast('❌ ID 仅限英文、数字和下划线', true); return; }
+  const skill = { id, name, description: document.getElementById('m-skill-desc')?.value?.trim() || '', enabled: document.getElementById('m-skill-enabled')?.checked !== false, parameters: collectParams() };
+  try {
+    if (S.modalMode === 'edit-skill') await apiPut('/api/skills/' + id, { skill });
+    else await apiPost('/api/skills/', { skill });
+    closeModal(); await loadSkills(); renderSkills(); populateAgentSelector();
+    toast('✅ 技能已' + (S.modalMode === 'edit-skill' ? '更新' : '创建'));
+  } catch(e) { toast('❌ ' + e.message, true); }
+}
+
+// AGENTS
+function bindAgents() { document.getElementById('add-agent-btn').addEventListener('click', () => openAgentModal(null)); }
+async function loadAgents() { try { const r = await fetch('/api/agents/'); if (r.ok) S.agents = (await r.json()).agents || []; } catch(e) {} }
+function renderAgents() {
+  const c = document.getElementById('agents-list');
+  if (!S.agents.length) { c.innerHTML = '<div class="text-center text-gray-400 py-8">暂无智能体，点击"添加智能体"创建第一个智能体</div>'; return; }
+  c.innerHTML = S.agents.map(ag => `
+    <div class="bg-white rounded-xl border border-gray-200 p-4 shadow-sm hover:shadow-md transition-shadow">
+      <div class="flex items-start justify-between gap-3">
+        <div class="flex-1 min-w-0">
+          <div class="flex items-center gap-2 mb-1 flex-wrap">
+            <h3 class="font-semibold text-gray-800">${esc(ag.name)}</h3>
+            <span class="text-xs px-2 py-0.5 rounded-full ${ag.enabled ? 'bg-blue-50 text-blue-600' : 'bg-gray-100 text-gray-500'}">${ag.enabled ? '已启用' : '已禁用'}</span>
+            ${ag.model ? '<span class="text-xs text-gray-400 font-mono">' + esc(ag.model) + '</span>' : ''}
+          </div>
+          <p class="text-sm text-gray-500">${esc(ag.description || '')}</p>
+          <p class="text-xs text-gray-400 mt-1 font-mono">ID: ${esc(ag.id)}</p>
+          ${ag.skills?.length ? '<div class="flex flex-wrap gap-1 mt-2">' + ag.skills.map(s => '<span class="text-xs bg-purple-50 text-purple-600 px-2 py-0.5 rounded-full">' + esc(s) + '</span>').join('') + '</div>' : ''}
+        </div>
+        <div class="flex items-center gap-1 flex-shrink-0">
+          <button class="agent-edit-btn text-xs text-blue-600 hover:text-blue-700 px-2 py-1 rounded hover:bg-blue-50 transition-all" data-id="${esc(ag.id)}">编辑</button>
+          <button class="agent-toggle-btn text-xs ${ag.enabled ? 'text-orange-600 hover:text-orange-700' : 'text-green-600 hover:text-green-700'} px-2 py-1 rounded hover:bg-gray-50 transition-all" data-id="${esc(ag.id)}" data-enabled="${ag.enabled}">${ag.enabled ? '禁用' : '启用'}</button>
+          <button class="agent-del-btn text-xs text-red-500 hover:text-red-600 px-2 py-1 rounded hover:bg-red-50 transition-all" data-id="${esc(ag.id)}">删除</button>
+        </div>
+      </div>
+    </div>`).join('');
+  c.querySelectorAll('.agent-edit-btn').forEach(b => b.addEventListener('click', () => openAgentModal(S.agents.find(a => a.id === b.dataset.id))));
+  c.querySelectorAll('.agent-toggle-btn').forEach(b => b.addEventListener('click', async () => {
+    const ag = S.agents.find(a => a.id === b.dataset.id); if (!ag) return;
+    const enabled = b.dataset.enabled !== 'true';
+    await apiPut('/api/agents/' + ag.id, { agent: Object.assign({}, ag, { enabled }) });
+    await loadAgents(); renderAgents(); populateAgentSelector(); toast('✅ 智能体已' + (enabled ? '启用' : '禁用'));
+  }));
+  c.querySelectorAll('.agent-del-btn').forEach(b => b.addEventListener('click', async () => {
+    if (!confirm('确定删除智能体 "' + b.dataset.id + '" 吗？')) return;
+    await apiDel('/api/agents/' + b.dataset.id); await loadAgents(); renderAgents(); populateAgentSelector(); toast('✅ 智能体已删除');
+  }));
+}
+
+function populateAgentSelector() {
+  const sel = document.getElementById('agent-selector'); const cur = sel.value;
+  sel.innerHTML = '<option value="">默认 (全局配置)</option>';
+  S.agents.filter(a => a.enabled).forEach(ag => { const o = document.createElement('option'); o.value = ag.id; o.textContent = ag.name; if (ag.id === cur) o.selected = true; sel.appendChild(o); });
+}
+
+function openAgentModal(agent) {
+  S.modalMode = agent ? 'edit-agent' : 'add-agent'; S.modalTarget = agent?.id || null;
+  const selectedSkills = new Set(agent?.skills || []);
+  const skillCbs = S.skills.length
+    ? S.skills.map(s => '<label class="flex items-center gap-2 text-sm cursor-pointer hover:bg-gray-50 px-2 py-1.5 rounded transition-all"><input type="checkbox" class="agent-skill-cb w-4 h-4 accent-blue-600" value="' + esc(s.id) + '" ' + (selectedSkills.has(s.id) ? 'checked' : '') + '><span class="flex-1">' + esc(s.name) + '</span><span class="text-xs text-gray-400 font-mono">' + esc(s.id) + '</span></label>').join('')
+    : '<p class="text-xs text-gray-400 py-2 px-2">暂无可用技能（先在技能面板添加）</p>';
+  const wrap = document.createElement('div'); wrap.className = 'space-y-4';
+  wrap.innerHTML = `
+    <div class="grid grid-cols-2 gap-4">
+      <div>
+        <label class="block text-sm font-medium text-gray-700 mb-1.5">智能体 ID <span class="text-red-500">*</span></label>
+        <input id="m-agent-id" type="text" class="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 ${agent ? 'bg-gray-50 cursor-not-allowed' : ''}" value="${esc(agent?.id||'')}" ${agent ? 'readonly' : ''} placeholder="如: my_agent">
+      </div>
+      <div>
+        <label class="block text-sm font-medium text-gray-700 mb-1.5">名称 <span class="text-red-500">*</span></label>
+        <input id="m-agent-name" type="text" class="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500" value="${esc(agent?.name||'')}" placeholder="如: 科研助手">
+      </div>
+    </div>
+    <div>
+      <label class="block text-sm font-medium text-gray-700 mb-1.5">描述</label>
+      <input id="m-agent-desc" type="text" class="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500" value="${esc(agent?.description||'')}" placeholder="智能体的功能描述">
+    </div>
+    <div>
+      <label class="block text-sm font-medium text-gray-700 mb-1.5">系统提示词</label>
+      <textarea id="m-agent-prompt" class="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm font-mono focus:ring-2 focus:ring-blue-500" rows="4" placeholder="设置智能体的角色和行为准则…">${esc(agent?.system_prompt||'')}</textarea>
+    </div>
+    <div>
+      <label class="block text-sm font-medium text-gray-700 mb-1.5">指定模型 <span class="text-gray-400 font-normal">(留空使用全局配置)</span></label>
+      <input id="m-agent-model" type="text" class="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500" value="${esc(agent?.model||'')}" placeholder="如: gpt-4o">
+    </div>
+    <div class="grid grid-cols-2 gap-4">
+      <div>
+        <label class="block text-sm font-medium text-gray-700 mb-1.5">Temperature <span class="text-gray-400">(0-2)</span></label>
+        <input id="m-agent-temp" type="number" class="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm" value="${agent?.temperature ?? 0.7}" min="0" max="2" step="0.1">
+      </div>
+      <div>
+        <label class="block text-sm font-medium text-gray-700 mb-1.5">Max Tokens</label>
+        <input id="m-agent-tokens" type="number" class="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm" value="${agent?.max_tokens || 2048}" min="1">
+      </div>
+    </div>
+    <div>
+      <label class="block text-sm font-medium text-gray-700 mb-2">关联技能</label>
+      <div class="border border-gray-200 rounded-lg overflow-hidden divide-y divide-gray-100 max-h-44 overflow-y-auto">${skillCbs}</div>
+    </div>
+    <label class="flex items-center gap-2.5 cursor-pointer">
+      <input id="m-agent-enabled" type="checkbox" class="oc-toggle" ${agent?.enabled !== false ? 'checked' : ''}><span class="text-sm text-gray-700">启用此智能体</span>
+    </label>`;
+  openModal(agent ? '编辑智能体' : '添加智能体', wrap, [
+    { label:'取消', cls:'border border-gray-200 text-gray-700 hover:bg-gray-50', action: closeModal },
+    { label: agent ? '保存更改' : '创建智能体', cls:'bg-blue-600 hover:bg-blue-700 text-white', action: submitAgentForm },
+  ]);
+}
+
+async function submitAgentForm() {
+  const id = document.getElementById('m-agent-id')?.value?.trim();
+  const name = document.getElementById('m-agent-name')?.value?.trim();
+  if (!id || !name) { toast('❌ ID 和名称不能为空', true); return; }
+  if (S.modalMode === 'add-agent' && !/^[a-zA-Z0-9_]+$/.test(id)) { toast('❌ ID 仅限英文、数字和下划线', true); return; }
+  const skills = Array.from(document.querySelectorAll('.agent-skill-cb:checked')).map(el => el.value);
+  const agent = { id, name, description: document.getElementById('m-agent-desc')?.value?.trim() || '', system_prompt: document.getElementById('m-agent-prompt')?.value || '', model: document.getElementById('m-agent-model')?.value?.trim() || '', temperature: parseFloat(document.getElementById('m-agent-temp')?.value) || 0.7, max_tokens: parseInt(document.getElementById('m-agent-tokens')?.value) || 2048, skills, enabled: document.getElementById('m-agent-enabled')?.checked !== false };
+  try {
+    if (S.modalMode === 'edit-agent') await apiPut('/api/agents/' + id, { agent });
+    else await apiPost('/api/agents/', { agent });
+    closeModal(); await loadAgents(); renderAgents(); populateAgentSelector();
+    toast('✅ 智能体已' + (S.modalMode === 'edit-agent' ? '更新' : '创建'));
+  } catch(e) { toast('❌ ' + e.message, true); }
+}
+
+// MODAL ENGINE
+function bindModal() {
+  document.getElementById('modal-close-x').addEventListener('click', closeModal);
+  document.getElementById('modal-overlay').addEventListener('click', e => { if (e.target === document.getElementById('modal-overlay')) closeModal(); });
+  document.addEventListener('keydown', e => { if (e.key === 'Escape') closeModal(); });
+}
+function openModal(title, bodyEl, buttons) {
+  document.getElementById('modal-title').textContent = title;
+  const body = document.getElementById('modal-body'); body.innerHTML = ''; body.appendChild(bodyEl);
+  const footer = document.getElementById('modal-footer'); footer.innerHTML = '';
+  buttons.forEach(({ label, cls, action }) => {
+    const btn = document.createElement('button'); btn.textContent = label;
+    btn.className = 'flex-1 ' + cls + ' rounded-xl py-2.5 text-sm font-medium transition-all';
+    btn.addEventListener('click', action); footer.appendChild(btn);
+  });
+  document.getElementById('modal-overlay').classList.add('open');
+}
+function closeModal() {
+  document.getElementById('modal-overlay').classList.remove('open');
+  document.getElementById('modal-body').innerHTML = ''; document.getElementById('modal-footer').innerHTML = '';
+  S.modalMode = null; S.modalTarget = null;
+}
+
+// API HELPERS
+async function apiPut(url, body) { const r = await fetch(url, { method:'PUT', headers:{'Content-Type':'application/json'}, body:JSON.stringify(body) }); if (!r.ok) { const d = await r.json().catch(() => ({})); throw new Error(d.detail || 'HTTP ' + r.status); } return r.json(); }
+async function apiPost(url, body) { const r = await fetch(url, { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(body) }); if (!r.ok) { const d = await r.json().catch(() => ({})); throw new Error(d.detail || 'HTTP ' + r.status); } return r.json(); }
+async function apiDel(url) { const r = await fetch(url, { method:'DELETE' }); if (!r.ok) { const d = await r.json().catch(() => ({})); throw new Error(d.detail || 'HTTP ' + r.status); } return r.json(); }
+
+// UTILS
+function getVal(id) { return document.getElementById(id)?.value || ''; }
+function setVal(id, v) { const el = document.getElementById(id); if (el) el.value = v; }
+function setStatus(id, msg, color) { const el = document.getElementById(id); if (el) { el.textContent = msg; el.className = 'mt-3 text-sm text-center text-' + color + '-600'; } }
+let _toastTimer;
+function toast(msg, isError=false) {
+  const t = document.getElementById('toast'); document.getElementById('toast-msg').textContent = msg;
+  t.className = 'fixed bottom-6 right-6 z-[60] flex items-center gap-3 text-white px-4 py-3 rounded-xl shadow-lg text-sm max-w-sm ' + (isError ? 'bg-red-600' : 'bg-gray-900');
+  clearTimeout(_toastTimer); _toastTimer = setTimeout(() => t.classList.add('hidden'), 3500);
+}
+</script>
+</body>
+</html>
