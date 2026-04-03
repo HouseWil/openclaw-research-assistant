@@ -166,7 +166,7 @@ async def _openai_nonstream_with_tools(
                 }
             )
 
-    return {"content": "工具调用轮次已达上限，请缩小问题范围后重试。", "model": model}
+    return {"content": f"工具调用已达到最大轮次({MAX_TOOL_ROUNDS}次)，请缩小问题范围后重试。", "model": model}
 
 
 async def _stream_openai(client, model: str, messages: list, temperature: float, max_tokens: int) -> AsyncGenerator[str, None]:

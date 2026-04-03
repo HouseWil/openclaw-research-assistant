@@ -665,9 +665,15 @@ async function submitSkillForm() {
   if (!id || !name) { toast('❌ ID 和名称不能为空', true); return; }
   if (S.modalMode === 'add-skill' && !/^[a-zA-Z0-9_]+$/.test(id)) { toast('❌ ID 仅限英文、数字和下划线', true); return; }
   const parseJsonField = (fieldId, fallback) => {
+    const fieldNameMap = {
+      'm-skill-exec-headers': '执行配置 - Headers',
+      'm-skill-exec-query': '执行配置 - Query',
+      'm-skill-exec-body': '执行配置 - Body',
+      'm-skill-arg-schema': '参数 Schema',
+    };
     const raw = document.getElementById(fieldId)?.value?.trim() || '';
     if (!raw) return fallback;
-    try { return JSON.parse(raw); } catch (e) { throw new Error(fieldId + ' 不是合法 JSON'); }
+    try { return JSON.parse(raw); } catch (e) { throw new Error((fieldNameMap[fieldId] || fieldId) + ' 不是合法 JSON'); }
   };
   let headers = {};
   let query = {};

@@ -84,7 +84,7 @@ def _validate_tool_args(args: Dict[str, Any]) -> None:
             raise SkillExecutionError(f"Argument '{k}' is too long")
 
 
-def _allowed_domains(execution: Dict[str, Any]) -> set[str]:
+def _get_allowed_domains(execution: Dict[str, Any]) -> set[str]:
     configured = execution.get("allowed_domains")
     if isinstance(configured, list):
         cleaned = {str(x).strip().lower() for x in configured if str(x).strip()}
@@ -169,7 +169,7 @@ async def execute_skill(skill: Dict[str, Any], args: Dict[str, Any]) -> Dict[str
     if not isinstance(endpoint, str):
         endpoint = str(endpoint)
 
-    allowed = _allowed_domains(execution)
+    allowed = _get_allowed_domains(execution)
     _validate_target(endpoint, allowed)
 
     timeout = _clamp_int(execution.get("timeout_seconds"), default=10, min_v=1, max_v=30)
@@ -180,7 +180,6 @@ async def execute_skill(skill: Dict[str, Any], args: Dict[str, Any]) -> Dict[str
     body = _render_template(execution.get("body") or None, args)
 
     start = time.perf_counter()
-    last_err = None
     for attempt in range(retries + 1):
         try:
             async with httpx.AsyncClient(timeout=timeout, follow_redirects=True) as client:
@@ -194,13 +193,10 @@ async def execute_skill(skill: Dict[str, Any], args: Dict[str, Any]) -> Dict[str
                 response.raise_for_status()
             break
         except Exception as exc:
-            last_err = exc
             if attempt >= retries:
                 elapsed = (time.perf_counter() - start) * 1000
                 logger.warning("skill_execute_failed skill=%s ms=%.1f err=%s", skill_id, elapsed, type(exc).__name__)
                 raise SkillExecutionError(f"HTTP request failed: {type(exc).__name__}") from exc
-    else:
-        raise SkillExecutionError(f"HTTP request failed: {type(last_err).__name__ if last_err else 'Unknown'}")
 
     content_type = response.headers.get("content-type", "")
     parsed: Any
