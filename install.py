@@ -283,7 +283,7 @@ def main():
     if args.skip or (CONFIG_DIR / "openclaw.yaml").exists():
         cprint("\n⚙️  检测到已有配置，跳过安装向导", BLUE)
         if not args.skip:
-            cprint("   提示: 使用 --reinstall 重新运行安装向导", YELLOW)
+            cprint("   提示: 运行 'python install.py' 并删除 config/openclaw.yaml 可重新安装", YELLOW)
     else:
         run_installer_server()
 

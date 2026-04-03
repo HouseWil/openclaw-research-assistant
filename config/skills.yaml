@@ -1,11 +1,11 @@
 skills:
 - id: web_search
-  name: 网络搜索-升级
-  description: 改进的网络搜索
-  enabled: true
+  name: 网络搜索
+  description: 搜索互联网获取最新信息
+  enabled: false
   parameters:
-    search_engine: bing
-    max_results: '10'
+    search_engine: google
+    max_results: '5'
 - id: paper_reader
   name: 论文阅读
   description: 解析和总结学术论文

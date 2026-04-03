@@ -51,7 +51,7 @@ async def _stream_openai(client, model: str, messages: list, temperature: float,
                 yield f"data: {json.dumps({'content': delta.content, 'done': False})}\n\n"
         yield f"data: {json.dumps({'content': '', 'done': True})}\n\n"
     except Exception as e:
-        yield f"data: {json.dumps({'error': str(e), 'done': True})}\n\n"
+        yield f"data: {json.dumps({'error': type(e).__name__, 'done': True})}\n\n"
 
 
 async def _stream_anthropic(client, model: str, messages: list, system_prompt: str, temperature: float, max_tokens: int) -> AsyncGenerator[str, None]:
@@ -72,7 +72,7 @@ async def _stream_anthropic(client, model: str, messages: list, system_prompt: s
                 yield f"data: {json.dumps({'content': text, 'done': False})}\n\n"
         yield f"data: {json.dumps({'content': '', 'done': True})}\n\n"
     except Exception as e:
-        yield f"data: {json.dumps({'error': str(e), 'done': True})}\n\n"
+        yield f"data: {json.dumps({'error': type(e).__name__, 'done': True})}\n\n"
 
 
 @router.post("/")
@@ -151,7 +151,7 @@ async def chat(request: ChatRequest):
                 return {"content": response.choices[0].message.content, "model": model}
 
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"LLM API error: {str(e)}")
+        raise HTTPException(status_code=500, detail="LLM API error: " + type(e).__name__)
 
 
 @router.get("/models")
