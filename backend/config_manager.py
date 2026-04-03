@@ -29,16 +29,6 @@ DEFAULT_OPENCLAW_CONFIG = {
         "language": "zh-CN",
         "show_thinking": False,
     },
-    "gateway": {
-        "enabled": False,
-        "auto_start": False,
-        "host": "127.0.0.1",
-        "port": 18789,
-        "password": "",
-        "openclaw_command": "openclaw",
-        "startup_timeout": 30,
-        "health_check_interval": 5,
-    },
 }
 
 DEFAULT_SKILLS_CONFIG = {
