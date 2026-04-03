@@ -112,10 +112,12 @@ def build_openai_tool(skill: Dict[str, Any]) -> Dict[str, Any]:
 
     arg_schema = skill.get("arg_schema")
     # Keep validation lightweight here: enforce object/properties shape only.
-    # Full JSON Schema validation is intentionally omitted for compatibility.
+    # Full JSON Schema validation is intentionally omitted to stay compatible
+    # with legacy/frontmatter-defined skills that may carry partial schemas.
     has_valid_schema = isinstance(arg_schema, dict) and isinstance(arg_schema.get("properties"), dict)
     if not has_valid_schema:
         params = skill.get("parameters") if isinstance(skill.get("parameters"), dict) else {}
+        logger.warning("skill_arg_schema_fallback skill=%s", skill_id)
         arg_schema = {
             "type": "object",
             "properties": {k: {"type": "string", "description": f"参数: {k}"} for k in params.keys()},

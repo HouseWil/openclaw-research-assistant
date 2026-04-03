@@ -107,7 +107,8 @@ def _normalize_skill_payload(payload: Dict[str, Any], fallback_id: str = "") -> 
             execution["headers"] = {}
         if execution.get("query") is not None and not isinstance(execution.get("query"), dict):
             execution["query"] = {}
-        if execution.get("body") is not None and not isinstance(execution.get("body"), (dict, list, str, int, float, bool)):
+        body = execution.get("body")
+        if body is not None and not isinstance(body, (dict, list, str, int, float, bool)):
             execution["body"] = None
         skill["execution"] = execution
     if "arg_schema" in skill and not isinstance(skill.get("arg_schema"), dict):

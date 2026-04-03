@@ -166,7 +166,13 @@ async def _openai_nonstream_with_tools(
                 }
             )
 
-    return {"content": f"Tool calling reached max rounds ({MAX_TOOL_ROUNDS}); please narrow your request and retry.", "model": model}
+    return {
+        "content": (
+            f"Tool calling reached max rounds ({MAX_TOOL_ROUNDS}); "
+            "please simplify your request or break it into smaller steps and retry."
+        ),
+        "model": model,
+    }
 
 
 async def _stream_openai(client, model: str, messages: list, temperature: float, max_tokens: int) -> AsyncGenerator[str, None]:

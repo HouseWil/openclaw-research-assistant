@@ -674,7 +674,7 @@ async function submitSkillForm() {
   const parseJsonField = (fieldId, fallback) => {
     const raw = document.getElementById(fieldId)?.value?.trim() || '';
     if (!raw) return fallback;
-    try { return JSON.parse(raw); } catch (e) { throw new Error((SKILL_JSON_FIELD_NAME_MAP[fieldId] || fieldId) + ' 不是合法 JSON'); }
+    try { return JSON.parse(raw); } catch (e) { throw new Error((SKILL_JSON_FIELD_NAME_MAP[fieldId] || fieldId) + ' 不是合法 JSON：' + (e?.message || '格式错误')); }
   };
   let headers = {};
   let query = {};
