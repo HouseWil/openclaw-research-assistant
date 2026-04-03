@@ -161,6 +161,18 @@ def _start_gateway_impl(cfg: dict, allow_stale_lock_retry: bool) -> dict:
     def _handle_unexpected_exit(stderr_text: str) -> dict:
         """Handle early process exit; retry once on stale-lock errors."""
         if allow_stale_lock_retry and any(m in stderr_text.lower() for m in _STALE_LOCK_MARKERS):
+            # The binary exited because of a lock conflict.  Before we clear
+            # the lock (which stops any running gateway), check whether the
+            # gateway is actually reachable.  This handles the race where the
+            # binary exits due to a lock held by a live, fully-started gateway
+            # process — clearing the lock in that case would kill the user's
+            # running gateway unnecessarily.
+            if is_running(cfg):
+                logger.info(
+                    "Gateway reported a lock conflict but the canvas endpoint is "
+                    "reachable; treating as already running."
+                )
+                return {"success": True, "message": "Gateway 已经在运行中"}
             logger.warning(
                 "Gateway exited with a stale-lock error; running 'openclaw gateway stop' "
                 "to clear the lock and retrying. stderr: %s",
