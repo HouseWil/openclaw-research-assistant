@@ -35,6 +35,50 @@ def _get_agent_config(agent_id: str):
     return None
 
 
+def _get_skill_map():
+    mgr = ConfigManager(CONFIG_DIR)
+    skills_cfg = mgr.get_skills()
+    return {s.get("id"): s for s in skills_cfg.get("skills", []) if isinstance(s, dict) and s.get("id")}
+
+
+def _build_skills_prompt(agent: dict) -> str:
+    skill_ids = [s for s in (agent.get("skills") or []) if isinstance(s, str) and s.strip()]
+    if not skill_ids:
+        return ""
+
+    skill_map = _get_skill_map()
+    enabled_skills = []
+    for sid in skill_ids:
+        sk = skill_map.get(sid)
+        if not sk or sk.get("enabled") is False:
+            continue
+        enabled_skills.append(sk)
+
+    if not enabled_skills:
+        return ""
+
+    sections = ["\n\n可用技能（按需使用，优先遵守每个技能说明）："]
+    for sk in enabled_skills:
+        header = f"- {sk.get('name') or sk.get('id')} ({sk.get('id')})"
+        lines = [header]
+        if sk.get("description"):
+            lines.append(f"  描述: {sk.get('description')}")
+        params = sk.get("parameters")
+        if isinstance(params, dict) and params:
+            lines.append(f"  参数: {json.dumps(params, ensure_ascii=False)}")
+        if sk.get("markdown"):
+            lines.append("  技能文档:")
+            for ln in str(sk.get("markdown")).splitlines():
+                lines.append("  " + ln)
+        elif sk.get("content"):
+            lines.append("  技能文档:")
+            for ln in str(sk.get("content")).splitlines():
+                lines.append("  " + ln)
+        sections.append("\n".join(lines))
+
+    return "\n".join(sections)
+
+
 async def _stream_openai(client, model: str, messages: list, temperature: float, max_tokens: int) -> AsyncGenerator[str, None]:
     """Stream responses from OpenAI-compatible API."""
     try:
@@ -100,6 +144,7 @@ async def chat(request: ChatRequest):
         agent = _get_agent_config(request.agent_id)
         if agent:
             system_prompt = agent.get("system_prompt", "")
+            system_prompt += _build_skills_prompt(agent)
             if agent.get("model"):
                 model = agent["model"]
             temperature = agent.get("temperature", temperature)
