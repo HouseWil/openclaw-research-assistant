@@ -6,6 +6,7 @@ agents:
   model: ''
   system_prompt: 你是一位专业的科研助手，具备深厚的学术背景。你能够帮助研究人员进行文献调研、数据分析、论文写作和实验设计。请用专业、准确、简洁的语言回答问题，并在适当时引用相关文献。
   skills:
+  - weather
   - paper_reader
   - citation_manager
   temperature: 0.7

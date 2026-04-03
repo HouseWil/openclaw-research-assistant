@@ -5,6 +5,7 @@ Chat router - handles LLM chat requests with streaming support.
 import sys
 from pathlib import Path
 from typing import AsyncGenerator
+import logging
 
 from fastapi import APIRouter, HTTPException
 from fastapi.responses import StreamingResponse
@@ -13,12 +14,21 @@ import json
 sys.path.insert(0, str(Path(__file__).parent.parent))
 from config_manager import ConfigManager
 from models import ChatRequest
+from skill_executor import (
+    SkillExecutionError,
+    build_openai_tool,
+    collect_executable_skills,
+    execute_skill,
+)
 
 BASE_DIR = Path(__file__).parent.parent.parent
 CONFIG_DIR = BASE_DIR / "config"
 
 router = APIRouter()
 SKILLS_PROMPT_HEADER = "\n\n可用技能（按需使用，优先遵守每个技能说明）："
+# Guardrail for tool loops to avoid runaway cost/latency and infinite recursion.
+MAX_TOOL_ROUNDS = 4
+logger = logging.getLogger(__name__)
 
 
 def _get_llm_config():
@@ -78,6 +88,93 @@ def _build_skills_prompt(agent: dict) -> str:
         sections.append("\n".join(lines))
 
     return "\n".join(sections)
+
+
+def _normalize_tool_args(raw: str) -> dict:
+    if not raw:
+        return {}
+    try:
+        parsed = json.loads(raw)
+        return parsed if isinstance(parsed, dict) else {}
+    except Exception:
+        return {}
+
+
+async def _openai_nonstream_with_tools(
+    client,
+    model: str,
+    messages: list,
+    temperature: float,
+    max_tokens: int,
+    executable_skills: list,
+):
+    skill_by_id = {s.get("id"): s for s in executable_skills}
+    tools = [build_openai_tool(sk) for sk in executable_skills]
+    working_messages = list(messages)
+
+    for _ in range(MAX_TOOL_ROUNDS):
+        response = await client.chat.completions.create(
+            model=model,
+            messages=working_messages,
+            temperature=temperature,
+            max_tokens=max_tokens,
+            tools=tools,
+            tool_choice="auto",
+        )
+        msg = response.choices[0].message
+        assistant_entry = {"role": "assistant", "content": msg.content or ""}
+        tool_calls = msg.tool_calls or []
+        if tool_calls:
+            assistant_entry["tool_calls"] = [
+                {
+                    "id": tc.id,
+                    "type": "function",
+                    "function": {
+                        "name": tc.function.name,
+                        "arguments": tc.function.arguments or "{}",
+                    },
+                }
+                for tc in tool_calls
+            ]
+        working_messages.append(assistant_entry)
+
+        if not tool_calls:
+            return {"content": msg.content or "", "model": model}
+
+        for tc in tool_calls:
+            skill_id = tc.function.name
+            tool_args = _normalize_tool_args(tc.function.arguments)
+            skill = skill_by_id.get(skill_id)
+
+            if not skill:
+                tool_output = json.dumps({"ok": False, "error": f"Unknown tool '{skill_id}'"}, ensure_ascii=False)
+            else:
+                try:
+                    result = await execute_skill(skill, tool_args)
+                    tool_output = result.get("output", "")
+                except SkillExecutionError as exc:
+                    logger.warning("tool_execution_error tool=%s err=%s", skill_id, str(exc))
+                    tool_output = json.dumps({"ok": False, "error": str(exc)}, ensure_ascii=False)
+                except Exception as exc:
+                    logger.exception("tool_execution_unexpected tool=%s", skill_id)
+                    tool_output = json.dumps({"ok": False, "error": "Tool execution failed"}, ensure_ascii=False)
+
+            working_messages.append(
+                {
+                    "role": "tool",
+                    "tool_call_id": tc.id,
+                    "content": tool_output,
+                }
+            )
+
+    return {
+        "content": (
+            f"Tool calling reached max rounds ({MAX_TOOL_ROUNDS}); "
+            "the model repeatedly requested tools without finishing. "
+            "Please simplify your request or break it into smaller steps and retry."
+        ),
+        "model": model,
+    }
 
 
 async def _stream_openai(client, model: str, messages: list, temperature: float, max_tokens: int) -> AsyncGenerator[str, None]:
@@ -141,11 +238,13 @@ async def chat(request: ChatRequest):
 
     # Inject agent system prompt if agent_id provided
     system_prompt = ""
+    executable_skills = []
     if request.agent_id:
         agent = _get_agent_config(request.agent_id)
         if agent:
             system_prompt = agent.get("system_prompt", "")
             system_prompt += _build_skills_prompt(agent)
+            executable_skills = collect_executable_skills(agent, _get_skill_map())
             if agent.get("model"):
                 model = agent["model"]
             temperature = agent.get("temperature", temperature)
@@ -181,13 +280,24 @@ async def chat(request: ChatRequest):
                 kwargs["base_url"] = api_base
             client = AsyncOpenAI(**kwargs)
 
-            if do_stream:
+            # Current tool loop is implemented in non-stream mode to ensure
+            # deterministic tool_call -> execute -> tool_result round trips.
+            if do_stream and not executable_skills:
                 return StreamingResponse(
                     _stream_openai(client, model, messages, temperature, max_tokens),
                     media_type="text/event-stream",
                     headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
                 )
             else:
+                if executable_skills:
+                    return await _openai_nonstream_with_tools(
+                        client=client,
+                        model=model,
+                        messages=messages,
+                        temperature=temperature,
+                        max_tokens=max_tokens,
+                        executable_skills=executable_skills,
+                    )
                 response = await client.chat.completions.create(
                     model=model,
                     messages=messages,

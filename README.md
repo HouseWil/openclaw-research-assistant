@@ -98,10 +98,44 @@ openclaw-research-assistant/
 - 查看所有技能及其参数
 - **添加技能** — 填写 ID、名称、描述、参数键值对
 - **导入技能文档** — 支持粘贴 frontmatter + Markdown 的完整技能定义（如 weather/wttr.in 示例）
-- **编辑技能** — 修改名称、描述和参数
+- **编辑技能** — 修改名称、描述、参数与执行配置（Endpoint/Method/Headers/Query/Result）
 - **启用/禁用** — 一键切换技能状态
 - **删除技能** — 移除不需要的技能
-- **智能体可用** — 智能体关联并启用后，会在对话系统提示中自动注入技能说明
+- **智能体可用** — 智能体关联并启用后，支持自动 tool calling 执行技能并回填结果
+
+#### 通用 Skill 执行协议（支持后续任意 skill.md）
+
+技能支持通过 frontmatter 或表单保存以下字段（示例）：
+
+```yaml
+id: weather
+name: 实时天气
+description: 查询天气
+arg_schema:
+  type: object
+  properties:
+    location:
+      type: string
+  required: [location]
+execution:
+  type: http
+  method: GET
+  endpoint: "https://wttr.in/{location}?format=j1"
+  allowed_domains: ["wttr.in"]
+  timeout_seconds: 10
+  retries: 1
+  headers: {}
+  query: {}
+  body: {}
+  result_path: "current_condition.0"
+  result_template: "{result}"
+```
+
+说明：
+- `arg_schema` 用于定义模型调用该 skill 的参数格式（JSON Schema）。
+- `execution` 是通用执行层，当前支持 `type: http`，后续可扩展其他执行类型。
+- `endpoint/query/headers/body` 支持模板变量（如 `{location}`）。
+- 出站请求受域名白名单约束（`allowed_domains`），并带超时、重试与参数长度限制。
 
 ### 🤖 智能体面板
 - 创建多个专业智能体（如：论文写作助手、数据分析助手）

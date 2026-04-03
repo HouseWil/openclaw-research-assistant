@@ -510,6 +510,14 @@ function openSkillModal(skill) {
   const params = skill?.parameters || {};
   const pRows = Object.entries(params).map(([k,v]) => mkParamRow(k, String(v))).join('');
   const rawMarkdown = skill?.markdown || '';
+  const execution = skill?.execution || {};
+  const executionType = execution?.type || 'http';
+  const executionMethod = execution?.method || 'GET';
+  const executionAllowedDomains = Array.isArray(execution?.allowed_domains) ? execution.allowed_domains.join(', ') : '';
+  const executionHeaders = execution?.headers ? JSON.stringify(execution.headers, null, 2) : '';
+  const executionQuery = execution?.query ? JSON.stringify(execution.query, null, 2) : '';
+  const executionBody = execution?.body ? JSON.stringify(execution.body, null, 2) : '';
+  const argSchema = skill?.arg_schema ? JSON.stringify(skill.arg_schema, null, 2) : '';
   wrap.innerHTML = `
     <div class="grid grid-cols-2 gap-4">
       <div>
@@ -530,6 +538,76 @@ function openSkillModal(skill) {
       <label class="block text-sm font-medium text-gray-700 mb-1.5">技能文档（可选）</label>
       <textarea id="m-skill-markdown" class="w-full border border-gray-200 rounded-lg px-3 py-2 text-xs font-mono focus:ring-2 focus:ring-blue-500" rows="8" placeholder="可粘贴包含 frontmatter 的完整技能文档，例如:  --- name: weather ... ---">${esc(rawMarkdown)}</textarea>
       <p class="text-xs text-gray-400 mt-1">支持你提供的 weather 这种 frontmatter+Markdown 格式。</p>
+    </div>
+    <div class="border border-gray-200 rounded-lg p-3 space-y-3 bg-gray-50">
+      <div class="flex items-center justify-between">
+        <label class="text-sm font-medium text-gray-700">执行配置（通用 tool 协议）</label>
+        <span class="text-[11px] text-gray-500">用于真实调用 API</span>
+      </div>
+      <div class="grid grid-cols-2 gap-3">
+        <div>
+          <label class="block text-xs font-medium text-gray-600 mb-1">执行类型 <span class="text-gray-400">(当前仅支持 http)</span></label>
+          <select id="m-skill-exec-type" class="w-full border border-gray-200 rounded-lg px-2.5 py-2 text-xs bg-white">
+            <option value="http" ${executionType === 'http' ? 'selected' : ''}>http</option>
+          </select>
+        </div>
+        <div>
+          <label class="block text-xs font-medium text-gray-600 mb-1">HTTP Method</label>
+          <select id="m-skill-exec-method" class="w-full border border-gray-200 rounded-lg px-2.5 py-2 text-xs bg-white">
+            <option value="GET" ${String(executionMethod).toUpperCase() === 'GET' ? 'selected' : ''}>GET</option>
+            <option value="POST" ${String(executionMethod).toUpperCase() === 'POST' ? 'selected' : ''}>POST</option>
+            <option value="PUT" ${String(executionMethod).toUpperCase() === 'PUT' ? 'selected' : ''}>PUT</option>
+            <option value="PATCH" ${String(executionMethod).toUpperCase() === 'PATCH' ? 'selected' : ''}>PATCH</option>
+            <option value="DELETE" ${String(executionMethod).toUpperCase() === 'DELETE' ? 'selected' : ''}>DELETE</option>
+          </select>
+        </div>
+      </div>
+      <div>
+        <label class="block text-xs font-medium text-gray-600 mb-1">Endpoint URL（支持 {location} 这种变量）</label>
+        <input id="m-skill-exec-endpoint" type="text" class="w-full border border-gray-200 rounded-lg px-3 py-2 text-xs font-mono bg-white" value="${esc(execution?.endpoint || '')}" placeholder="https://api.example.com/weather/{location}">
+      </div>
+      <div class="grid grid-cols-2 gap-3">
+        <div>
+          <label class="block text-xs font-medium text-gray-600 mb-1">Timeout (seconds)</label>
+          <input id="m-skill-exec-timeout" type="number" min="1" max="30" class="w-full border border-gray-200 rounded-lg px-3 py-2 text-xs bg-white" value="${esc(String(execution?.timeout_seconds ?? 10))}">
+        </div>
+        <div>
+          <label class="block text-xs font-medium text-gray-600 mb-1">Retries</label>
+          <input id="m-skill-exec-retries" type="number" min="0" max="2" class="w-full border border-gray-200 rounded-lg px-3 py-2 text-xs bg-white" value="${esc(String(execution?.retries ?? 1))}">
+        </div>
+      </div>
+      <div>
+        <label class="block text-xs font-medium text-gray-600 mb-1">Allowed Domains（逗号分隔）</label>
+        <input id="m-skill-exec-domains" type="text" class="w-full border border-gray-200 rounded-lg px-3 py-2 text-xs font-mono bg-white" value="${esc(executionAllowedDomains)}" placeholder="wttr.in, api.open-meteo.com">
+      </div>
+      <div class="grid grid-cols-2 gap-3">
+        <div>
+          <label class="block text-xs font-medium text-gray-600 mb-1">Result Path</label>
+          <input id="m-skill-exec-result-path" type="text" class="w-full border border-gray-200 rounded-lg px-3 py-2 text-xs font-mono bg-white" value="${esc(execution?.result_path || '')}" placeholder="current.temperature_2m">
+        </div>
+        <div>
+          <label class="block text-xs font-medium text-gray-600 mb-1">Result Template</label>
+          <input id="m-skill-exec-result-template" type="text" class="w-full border border-gray-200 rounded-lg px-3 py-2 text-xs font-mono bg-white" value="${esc(execution?.result_template || '')}" placeholder="当前温度: {result}°C">
+        </div>
+      </div>
+      <div class="grid grid-cols-2 gap-3">
+        <div>
+          <label class="block text-xs font-medium text-gray-600 mb-1">Headers (JSON)</label>
+          <textarea id="m-skill-exec-headers" class="w-full border border-gray-200 rounded-lg px-3 py-2 text-xs font-mono bg-white" rows="4" placeholder='{"Authorization":"Bearer ..."}'>${esc(executionHeaders)}</textarea>
+        </div>
+        <div>
+          <label class="block text-xs font-medium text-gray-600 mb-1">Query (JSON)</label>
+          <textarea id="m-skill-exec-query" class="w-full border border-gray-200 rounded-lg px-3 py-2 text-xs font-mono bg-white" rows="4" placeholder='{"q":"{location}"}'>${esc(executionQuery)}</textarea>
+        </div>
+      </div>
+      <div>
+        <label class="block text-xs font-medium text-gray-600 mb-1">Body (JSON, 可选)</label>
+        <textarea id="m-skill-exec-body" class="w-full border border-gray-200 rounded-lg px-3 py-2 text-xs font-mono bg-white" rows="4" placeholder='{"city":"{location}"}'>${esc(executionBody)}</textarea>
+      </div>
+      <div>
+        <label class="block text-xs font-medium text-gray-600 mb-1">参数 Schema (JSON Schema)</label>
+        <textarea id="m-skill-arg-schema" class="w-full border border-gray-200 rounded-lg px-3 py-2 text-xs font-mono bg-white" rows="5" placeholder='{"type":"object","properties":{"location":{"type":"string"}},"required":["location"]}'>${esc(argSchema)}</textarea>
+      </div>
     </div>
     <div>
       <div class="flex items-center justify-between mb-2">
@@ -570,6 +648,13 @@ function mkParamRow(k, v) {
   return '<div class="param-row flex gap-2 items-center"><input type="text" class="param-key flex-1 border border-gray-200 rounded-lg px-2.5 py-1.5 text-xs font-mono focus:ring-2 focus:ring-blue-500" placeholder="参数名" value="' + esc(k) + '"><span class="text-gray-400 text-xs flex-shrink-0">:</span><input type="text" class="param-val flex-1 border border-gray-200 rounded-lg px-2.5 py-1.5 text-xs font-mono focus:ring-2 focus:ring-blue-500" placeholder="参数值" value="' + esc(v) + '"><button type="button" class="param-del-btn flex-shrink-0 text-gray-400 hover:text-red-500 transition-colors"><svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg></button></div>';
 }
 
+const SKILL_JSON_FIELD_NAME_MAP = {
+  'm-skill-exec-headers': '执行配置 - Headers',
+  'm-skill-exec-query': '执行配置 - Query',
+  'm-skill-exec-body': '执行配置 - Body',
+  'm-skill-arg-schema': '参数 Schema',
+};
+
 function collectParams() {
   const params = {};
   document.querySelectorAll('.param-row').forEach(row => {
@@ -583,9 +668,52 @@ async function submitSkillForm() {
   const id = document.getElementById('m-skill-id')?.value?.trim();
   const name = document.getElementById('m-skill-name')?.value?.trim();
   const markdown = document.getElementById('m-skill-markdown')?.value || '';
+  const execEndpoint = document.getElementById('m-skill-exec-endpoint')?.value?.trim() || '';
   if (!id || !name) { toast('❌ ID 和名称不能为空', true); return; }
   if (S.modalMode === 'add-skill' && !/^[a-zA-Z0-9_]+$/.test(id)) { toast('❌ ID 仅限英文、数字和下划线', true); return; }
-  const skill = { id, name, description: document.getElementById('m-skill-desc')?.value?.trim() || '', enabled: document.getElementById('m-skill-enabled')?.checked !== false, parameters: collectParams(), markdown: markdown.trim() };
+  const parseJsonField = (fieldId, fallback) => {
+    const raw = document.getElementById(fieldId)?.value?.trim() || '';
+    if (!raw) return fallback;
+    try { return JSON.parse(raw); } catch (e) { throw new Error((SKILL_JSON_FIELD_NAME_MAP[fieldId] || fieldId) + ' 不是合法 JSON：' + String(e)); }
+  };
+  let headers = {};
+  let query = {};
+  let body = undefined;
+  let parsedArgSchema = {};
+  try {
+    headers = parseJsonField('m-skill-exec-headers', {});
+    query = parseJsonField('m-skill-exec-query', {});
+    body = parseJsonField('m-skill-exec-body', undefined);
+    parsedArgSchema = parseJsonField('m-skill-arg-schema', {});
+  } catch (e) {
+    toast('❌ ' + e.message, true);
+    return;
+  }
+  const allowedDomainsRaw = document.getElementById('m-skill-exec-domains')?.value?.trim() || '';
+  const allowedDomains = allowedDomainsRaw ? allowedDomainsRaw.split(',').map(s => s.trim()).filter(Boolean) : [];
+  const execution = execEndpoint ? {
+    type: (document.getElementById('m-skill-exec-type')?.value || 'http').trim() || 'http',
+    method: (document.getElementById('m-skill-exec-method')?.value || 'GET').trim() || 'GET',
+    endpoint: execEndpoint,
+    timeout_seconds: parseInt(document.getElementById('m-skill-exec-timeout')?.value) || 10,
+    retries: parseInt(document.getElementById('m-skill-exec-retries')?.value) || 1,
+    allowed_domains: allowedDomains,
+    result_path: document.getElementById('m-skill-exec-result-path')?.value?.trim() || '',
+    result_template: document.getElementById('m-skill-exec-result-template')?.value?.trim() || '',
+    headers,
+    query,
+    body,
+  } : undefined;
+  const skill = {
+    id,
+    name,
+    description: document.getElementById('m-skill-desc')?.value?.trim() || '',
+    enabled: document.getElementById('m-skill-enabled')?.checked !== false,
+    parameters: collectParams(),
+    markdown: markdown.trim(),
+    execution,
+    arg_schema: parsedArgSchema,
+  };
   try {
     if (S.modalMode === 'edit-skill') await apiPut('/api/skills/' + id, { skill });
     else await apiPost('/api/skills/', { skill });

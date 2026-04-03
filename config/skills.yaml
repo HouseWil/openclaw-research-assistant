@@ -1,4 +1,30 @@
 skills:
+- id: weather
+  name: 实时天气
+  description: 查询任意城市的实时天气（通过 wttr.in）
+  enabled: true
+  parameters:
+    location: 城市名或地名（英文，如 Beijing）
+  arg_schema:
+    type: object
+    properties:
+      location:
+        type: string
+        description: 城市名或地名（建议英文）
+    required:
+    - location
+  execution:
+    type: http
+    method: GET
+    endpoint: https://wttr.in/{location}?format=j1
+    timeout_seconds: 10
+    retries: 1
+    allowed_domains:
+    - wttr.in
+    result_path: current_condition.0
+    result_template: '{result}'
+    query: {}
+    headers: {}
 - id: web_search
   name: 网络搜索
   description: 搜索互联网获取最新信息
