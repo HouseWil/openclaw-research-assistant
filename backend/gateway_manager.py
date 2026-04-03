@@ -25,9 +25,14 @@ def _get_gateway_url(cfg: dict) -> str:
     return f"http://{host}:{port}"
 
 
+def _get_canvas_url(cfg: dict) -> str:
+    """Return the URL of the Gateway's built-in canvas web UI."""
+    return _get_gateway_url(cfg) + "/__openclaw__/canvas/"
+
+
 def is_running(cfg: dict) -> bool:
-    """Check whether the Gateway HTTP endpoint is reachable."""
-    url = _get_gateway_url(cfg)
+    """Check whether the Gateway canvas HTTP endpoint is reachable."""
+    url = _get_canvas_url(cfg)
     try:
         with httpx.Client(timeout=2.0) as client:
             resp = client.get(url)
@@ -97,7 +102,8 @@ def start_gateway(cfg: dict) -> dict:
     try:
         _gateway_process = subprocess.Popen(
             cmd,
-            stdout=subprocess.PIPE,
+            stdin=subprocess.DEVNULL,
+            stdout=subprocess.DEVNULL,
             stderr=subprocess.PIPE,
             **({"creationflags": subprocess.CREATE_NEW_PROCESS_GROUP} if sys.platform == "win32" else {"start_new_session": True}),
         )
@@ -164,7 +170,7 @@ def get_status(cfg: dict) -> dict:
         "managed": managed,
         "host": cfg.get("host", "127.0.0.1"),
         "port": cfg.get("port", 18789),
-        "url": _get_gateway_url(cfg),
+        "url": _get_canvas_url(cfg),
     }
 
 
