@@ -4,6 +4,7 @@ Gateway Manager - manages the local OpenClaw Gateway process lifecycle.
 
 import asyncio
 import logging
+import socket
 import shutil
 import subprocess
 import sys
@@ -20,6 +21,9 @@ _gateway_process: Optional[subprocess.Popen] = None
 
 # Substrings that indicate the openclaw binary exited due to a stale lock file.
 _STALE_LOCK_MARKERS = ("already running", "lock timeout")
+
+# Substrings that indicate the binary explicitly detected an already-running gateway.
+_ALREADY_RUNNING_MARKERS = ("already running locally",)
 
 # Seconds to wait after clearing a stale lock before retrying startup.
 # Gives the OS time to fully release any resources held by the previous process.
@@ -41,9 +45,20 @@ def is_running(cfg: dict) -> bool:
     """Check whether the Gateway canvas HTTP endpoint is reachable."""
     url = _get_canvas_url(cfg)
     try:
-        with httpx.Client(timeout=2.0) as client:
+        with httpx.Client(timeout=2.0, follow_redirects=False) as client:
             resp = client.get(url)
-            return 200 <= resp.status_code < 300
+            # A running gateway may return redirects/auth-required responses
+            # depending on configuration (e.g. password-protected canvas).
+            return resp.status_code < 500
+    except Exception:
+        return False
+
+
+def _is_port_open(host: str, port: int) -> bool:
+    """Best-effort TCP probe to detect if something is listening on host:port."""
+    try:
+        with socket.create_connection((host, int(port)), timeout=1.0):
+            return True
     except Exception:
         return False
 
@@ -160,16 +175,19 @@ def _start_gateway_impl(cfg: dict, allow_stale_lock_retry: bool) -> dict:
 
     def _handle_unexpected_exit(stderr_text: str) -> dict:
         """Handle early process exit; retry once on stale-lock errors."""
-        if allow_stale_lock_retry and any(m in stderr_text.lower() for m in _STALE_LOCK_MARKERS):
+        lower_stderr = stderr_text.lower()
+        if any(m in lower_stderr for m in _ALREADY_RUNNING_MARKERS):
+            return {"success": True, "message": "Gateway 已经在运行中"}
+        if allow_stale_lock_retry and any(m in lower_stderr for m in _STALE_LOCK_MARKERS):
             # The binary exited because of a lock conflict.  Before we clear
             # the lock (which stops any running gateway), check whether the
             # gateway is actually reachable.  This handles the race where the
             # binary exits due to a lock held by a live, fully-started gateway
             # process — clearing the lock in that case would kill the user's
             # running gateway unnecessarily.
-            if is_running(cfg):
+            if is_running(cfg) or _is_port_open(host, port):
                 logger.info(
-                    "Gateway reported a lock conflict but the canvas endpoint is "
+                    "Gateway reported a lock conflict but the endpoint/port is "
                     "reachable; treating as already running."
                 )
                 return {"success": True, "message": "Gateway 已经在运行中"}
