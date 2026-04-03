@@ -34,6 +34,37 @@ DEFAULT_OPENCLAW_CONFIG = {
 DEFAULT_SKILLS_CONFIG = {
     "skills": [
         {
+            "id": "weather",
+            "name": "实时天气",
+            "description": "查询任意城市的实时天气（通过 wttr.in）",
+            "enabled": True,
+            "parameters": {
+                "location": "城市名或地名（英文，如 Beijing）",
+            },
+            "arg_schema": {
+                "type": "object",
+                "properties": {
+                    "location": {
+                        "type": "string",
+                        "description": "城市名或地名（建议英文）",
+                    }
+                },
+                "required": ["location"],
+            },
+            "execution": {
+                "type": "http",
+                "method": "GET",
+                "endpoint": "https://wttr.in/{location}?format=j1",
+                "timeout_seconds": 10,
+                "retries": 1,
+                "allowed_domains": ["wttr.in"],
+                "result_path": "current_condition.0",
+                "result_template": "{result}",
+                "query": {},
+                "headers": {},
+            },
+        },
+        {
             "id": "web_search",
             "name": "网络搜索",
             "description": "搜索互联网获取最新信息",
@@ -89,7 +120,7 @@ DEFAULT_AGENTS_CONFIG = {
                 "你能够帮助研究人员进行文献调研、数据分析、论文写作和实验设计。"
                 "请用专业、准确、简洁的语言回答问题，并在适当时引用相关文献。"
             ),
-            "skills": ["paper_reader", "citation_manager"],
+            "skills": ["weather", "paper_reader", "citation_manager"],
             "temperature": 0.7,
             "max_tokens": 2048,
         },

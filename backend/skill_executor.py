@@ -111,7 +111,8 @@ def build_openai_tool(skill: Dict[str, Any]) -> Dict[str, Any]:
         raise ValueError("Skill id is required")
 
     arg_schema = skill.get("arg_schema")
-    if not isinstance(arg_schema, dict):
+    has_valid_schema = isinstance(arg_schema, dict) and isinstance(arg_schema.get("properties"), dict)
+    if not has_valid_schema:
         params = skill.get("parameters") if isinstance(skill.get("parameters"), dict) else {}
         arg_schema = {
             "type": "object",
