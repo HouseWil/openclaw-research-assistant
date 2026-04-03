@@ -808,6 +808,7 @@ function bindGateway() {
   document.getElementById('gw-stop-btn').addEventListener('click', stopGateway);
   document.getElementById('gw-refresh-btn').addEventListener('click', checkGatewayStatus);
   document.getElementById('save-gw-config-btn').addEventListener('click', saveGatewayConfig);
+  setInterval(checkGatewayStatus, 5000);
 }
 
 async function checkGatewayStatus() {
@@ -849,7 +850,7 @@ function updateGatewayUI(d) {
 
   // Update panel toolbar
   if (dot) { dot.className = 'w-2.5 h-2.5 rounded-full flex-shrink-0 ' + (running ? 'bg-teal-400' : 'bg-gray-300'); }
-  if (label) label.textContent = 'OpenClaw Gateway — ' + (running ? '已连接 (' + d.url + ')' : '未连接');
+  if (label) label.textContent = 'OpenClaw Gateway — ' + (running ? '已连接 (http://' + d.host + ':' + d.port + ')' : '未连接');
   if (startBtn) startBtn.classList.toggle('hidden', running);
   if (stopBtn) stopBtn.classList.toggle('hidden', !d.managed);
 

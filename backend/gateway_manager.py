@@ -25,9 +25,14 @@ def _get_gateway_url(cfg: dict) -> str:
     return f"http://{host}:{port}"
 
 
+def _get_canvas_url(cfg: dict) -> str:
+    """Return the URL of the Gateway's built-in canvas web UI."""
+    return _get_gateway_url(cfg) + "/__openclaw__/canvas/"
+
+
 def is_running(cfg: dict) -> bool:
-    """Check whether the Gateway HTTP endpoint is reachable."""
-    url = _get_gateway_url(cfg)
+    """Check whether the Gateway canvas HTTP endpoint is reachable."""
+    url = _get_canvas_url(cfg)
     try:
         with httpx.Client(timeout=2.0) as client:
             resp = client.get(url)
@@ -89,7 +94,7 @@ def start_gateway(cfg: dict) -> dict:
     port = cfg.get("port", 18789)
     timeout = int(cfg.get("startup_timeout", 30))
 
-    cmd = [command, "gateway", "run", "--host", str(host), "--port", str(port)]
+    cmd = [command, "gateway", "run", "--port", str(port)]
     password = cfg.get("password", "")
     if password:
         cmd += ["--password", password]
@@ -97,7 +102,8 @@ def start_gateway(cfg: dict) -> dict:
     try:
         _gateway_process = subprocess.Popen(
             cmd,
-            stdout=subprocess.PIPE,
+            stdin=subprocess.DEVNULL,
+            stdout=subprocess.DEVNULL,
             stderr=subprocess.PIPE,
             **({"creationflags": subprocess.CREATE_NEW_PROCESS_GROUP} if sys.platform == "win32" else {"start_new_session": True}),
         )
@@ -110,6 +116,17 @@ def start_gateway(cfg: dict) -> dict:
     deadline = time.monotonic() + timeout
     while time.monotonic() < deadline:
         if is_running(cfg):
+            # Brief stabilisation pause: confirm the gateway stays up and is not
+            # just transiently alive during initialisation.
+            time.sleep(1.0)
+            if _gateway_process.poll() is not None:
+                stderr_output = ""
+                try:
+                    _, err = _gateway_process.communicate(timeout=1)
+                    stderr_output = err.decode(errors="replace") if err else ""
+                except Exception:
+                    pass
+                return {"success": False, "message": f"Gateway 进程意外退出: {stderr_output[:200]}"}
             return {"success": True, "message": "Gateway 已成功启动"}
         if _gateway_process.poll() is not None:
             stderr_output = ""
@@ -153,7 +170,7 @@ def get_status(cfg: dict) -> dict:
         "managed": managed,
         "host": cfg.get("host", "127.0.0.1"),
         "port": cfg.get("port", 18789),
-        "url": _get_gateway_url(cfg),
+        "url": _get_canvas_url(cfg),
     }
 
 
