@@ -18,6 +18,7 @@ class ChatRequest(BaseModel):
     model: Optional[str] = Field(None, description="Override model from config")
     temperature: Optional[float] = Field(None, ge=0.0, le=2.0)
     max_tokens: Optional[int] = Field(None, ge=1)
+    use_rag: Optional[bool] = Field(False, description="Inject local knowledge-base context into the prompt")
 
 
 class LLMConfig(BaseModel):

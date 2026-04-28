@@ -4,7 +4,7 @@ Chat router - handles LLM chat requests with streaming support.
 
 import sys
 from pathlib import Path
-from typing import AsyncGenerator
+from typing import AsyncGenerator, List, Optional
 import logging
 
 from fastapi import APIRouter, HTTPException
@@ -13,7 +13,7 @@ import json
 
 sys.path.insert(0, str(Path(__file__).parent.parent))
 from config_manager import ConfigManager
-from models import ChatRequest
+from models import ChatMessage, ChatRequest
 from skill_executor import (
     SkillExecutionError,
     build_openai_tool,
@@ -23,6 +23,7 @@ from skill_executor import (
 
 BASE_DIR = Path(__file__).parent.parent.parent
 CONFIG_DIR = BASE_DIR / "config"
+DOCS_DIR = BASE_DIR / "docs"
 
 router = APIRouter()
 SKILLS_PROMPT_HEADER = "\n\n可用技能（按需使用，优先遵守每个技能说明）："
@@ -30,6 +31,9 @@ SKILLS_PROMPT_HEADER = "\n\n可用技能（按需使用，优先遵守每个技�
 MAX_TOOL_ROUNDS = 4
 # If model repeatedly requests the same tool calls, stop looping and force a final answer.
 MAX_SAME_TOOLCALL_ROUNDS = 1
+# Maximum characters of RAG context to inject so we don't overflow the context window.
+MAX_RAG_CONTEXT_CHARS = 3000
+
 logger = logging.getLogger(__name__)
 
 
@@ -212,6 +216,60 @@ async def _openai_nonstream_with_tools(
     }
 
 
+async def _build_rag_context(messages: List[ChatMessage], llm_cfg: dict) -> str:
+    """
+    Search the local knowledge base using the last user message and return a
+    formatted context string to be appended to the system prompt.
+    Returns an empty string when the knowledge base is empty or unavailable.
+    """
+    try:
+        from rag import RAGManager  # local import to avoid circular deps at module load
+
+        last_user_msg = ""
+        for m in reversed(messages):
+            if m.role == "user":
+                last_user_msg = m.content
+                break
+        if not last_user_msg:
+            return ""
+
+        mgr = RAGManager(DOCS_DIR, llm_cfg)
+        results = await mgr.search(last_user_msg, top_k=6)
+        if not results:
+            return ""
+
+        # Filter low-relevance results and cap total characters.
+        score_threshold = 0.05
+        filtered = [r for r in results if r["score"] > score_threshold]
+        if not filtered:
+            return ""
+
+        context_parts = []
+        total_chars = 0
+        for r in filtered[:5]:
+            entry = f"[来源: {r['filename']}]\n{r['text']}"
+            if total_chars + len(entry) > MAX_RAG_CONTEXT_CHARS:
+                remaining = MAX_RAG_CONTEXT_CHARS - total_chars
+                if remaining > 100:
+                    entry = entry[:remaining] + "…"
+                else:
+                    break
+            context_parts.append(entry)
+            total_chars += len(entry)
+
+        if not context_parts:
+            return ""
+
+        joined = "\n\n---\n\n".join(context_parts)
+        return (
+            "\n\n---\n以下是来自本地知识库的相关参考内容，请优先基于这些内容回答，"
+            "并在回答中注明参考来源：\n\n" + joined
+        )
+    except Exception as exc:
+        logger.warning("rag_context_failed err=%s", type(exc).__name__)
+        return ""
+
+
 async def _stream_openai(client, model: str, messages: list, temperature: float, max_tokens: int) -> AsyncGenerator[str, None]:
     """Stream responses from OpenAI-compatible API."""
     try:
@@ -284,6 +342,12 @@ async def chat(request: ChatRequest):
                 model = agent["model"]
             temperature = agent.get("temperature", temperature)
             max_tokens = agent.get("max_tokens", max_tokens)
+
+    # Inject RAG context when requested
+    if request.use_rag:
+        rag_context = await _build_rag_context(request.messages, llm_cfg)
+        if rag_context:
+            system_prompt = system_prompt + rag_context if system_prompt else rag_context
 
     if system_prompt:
         # Prepend system message if not already present

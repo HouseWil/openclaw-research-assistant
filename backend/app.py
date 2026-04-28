@@ -14,7 +14,7 @@ from contextlib import asynccontextmanager
 sys.path.insert(0, str(Path(__file__).parent))
 
 from config_manager import ConfigManager
-from routers import chat, config, skills, agents
+from routers import chat, config, skills, agents, docs
 
 BASE_DIR = Path(__file__).parent.parent
 FRONTEND_DIR = BASE_DIR / "frontend"
@@ -42,6 +42,7 @@ app.include_router(chat.router, prefix="/api/chat", tags=["chat"])
 app.include_router(config.router, prefix="/api/config", tags=["config"])
 app.include_router(skills.router, prefix="/api/skills", tags=["skills"])
 app.include_router(agents.router, prefix="/api/agents", tags=["agents"])
+app.include_router(docs.router, prefix="/api/docs", tags=["docs"])
 
 # Serve frontend static files
 if FRONTEND_DIR.exists():
