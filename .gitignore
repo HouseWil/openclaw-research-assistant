@@ -42,3 +42,6 @@ logs/
 # Test / temp
 .output/
 tmp/
+
+# User-uploaded documents and knowledge-base index (local data, not source code)
+docs/

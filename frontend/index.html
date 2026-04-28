@@ -25,13 +25,16 @@
   @keyframes blink{50%{opacity:0}}
   .panel{display:none}
   #panel-chat.active{display:flex;flex-direction:column;flex:1;overflow:hidden}
-  #panel-config.active,#panel-skills.active,#panel-agents.active,#panel-about.active{display:block;overflow-y:auto;background:#f9fafb;flex:1}
+  #panel-config.active,#panel-skills.active,#panel-agents.active,#panel-docs.active,#panel-about.active{display:block;overflow-y:auto;background:#f9fafb;flex:1}
   .oc-toggle{appearance:none;-webkit-appearance:none;width:2.5rem;height:1.25rem;background:#d1d5db;
     border-radius:9999px;cursor:pointer;position:relative;transition:background .2s;flex-shrink:0}
   .oc-toggle::before{content:'';position:absolute;width:1rem;height:1rem;background:white;
     border-radius:50%;top:.125rem;left:.125rem;transition:transform .2s;box-shadow:0 1px 3px rgba(0,0,0,.2)}
   .oc-toggle:checked{background:#2563eb}
   .oc-toggle:checked::before{transform:translateX(1.25rem)}
+  .drop-zone{border:2px dashed #d1d5db;transition:all .2s}
+  .drop-zone.drag-over{border-color:#2563eb;background:#eff6ff}
+  #rag-toggle-btn.active{background:#dbeafe;color:#2563eb;border-color:#93c5fd}
   #modal-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:50;
     align-items:center;justify-content:center;padding:1rem}
   #modal-overlay.open{display:flex}
@@ -78,6 +81,10 @@
       <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 3H5a2 2 0 00-2 2v4m6-6h10a2 2 0 012 2v4M9 3v18m0 0h10a2 2 0 002-2V9M9 21H5a2 2 0 01-2-2V9m0 0h18"/></svg>
       <span class="text-[9px] font-medium">智能体</span>
     </button>
+    <button id="nav-docs" class="nav-item w-12 h-12 rounded-xl flex flex-col items-center justify-center gap-0.5 text-gray-500 hover:bg-blue-50 hover:text-blue-600 transition-all" data-panel="docs" title="知识库">
+      <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 7v10c0 2.21 3.582 4 8 4s8-1.79 8-4V7M4 7c0 2.21 3.582 4 8 4s8-1.79 8-4M4 7c0-2.21 3.582-4 8-4s8 1.79 8 4m0 5c0 2.21-3.582 4-8 4s-8-1.79-8-4"/></svg>
+      <span class="text-[9px] font-medium">知识库</span>
+    </button>
     <div class="flex-1"></div>
     <button id="nav-about"  class="nav-item w-12 h-12 rounded-xl flex flex-col items-center justify-center gap-0.5 text-gray-500 hover:bg-blue-50 hover:text-blue-600 transition-all" data-panel="about" title="关于">
       <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
@@ -100,6 +107,10 @@
           <option value="">默认</option>
         </select>
         <div class="flex-1"></div>
+        <button id="rag-toggle-btn" class="text-xs border border-gray-200 text-gray-500 hover:text-blue-600 hover:border-blue-300 hover:bg-blue-50 flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg transition-all" title="启用/禁用本地知识库（RAG）">
+          <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 7v10c0 2.21 3.582 4 8 4s8-1.79 8-4V7M4 7c0 2.21 3.582 4 8 4s8-1.79 8-4M4 7c0-2.21 3.582-4 8-4s8 1.79 8 4"/></svg>
+          <span id="rag-toggle-label">知识库 关</span>
+        </button>
         <button id="clear-chat-btn" class="text-xs text-gray-500 hover:text-red-500 flex items-center gap-1 px-2 py-1 rounded hover:bg-red-50 transition-all">
           <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>清空对话
         </button>
@@ -235,6 +246,39 @@
     </div>
 
 
+    <!-- DOCS / KNOWLEDGE BASE -->
+    <div id="panel-docs" class="panel">
+      <div class="max-w-2xl mx-auto p-6">
+        <div class="mb-5">
+          <h2 class="text-xl font-bold text-gray-900">本地知识库</h2>
+          <p class="text-sm text-gray-500 mt-1">上传 PDF / DOCX / TXT / MD 文件，自动分块并向量化，在对话中启用 RAG 即可检索引用</p>
+        </div>
+
+        <!-- Upload zone -->
+        <div id="drop-zone" class="drop-zone bg-white rounded-xl p-8 text-center cursor-pointer mb-5 shadow-sm hover:border-blue-400 transition-all">
+          <input id="doc-file-input" type="file" accept=".pdf,.docx,.txt,.md" class="hidden" multiple>
+          <div id="upload-idle">
+            <svg class="w-10 h-10 text-gray-300 mx-auto mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"/></svg>
+            <p class="text-sm font-medium text-gray-600 mb-1">拖拽文件到此处，或<span class="text-blue-600 underline cursor-pointer" id="browse-btn">点击选择文件</span></p>
+            <p class="text-xs text-gray-400">支持 PDF · DOCX · TXT · MD，单文件最大 50 MB</p>
+          </div>
+          <div id="upload-progress" class="hidden">
+            <svg class="w-8 h-8 text-blue-500 mx-auto mb-2 animate-spin" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"></path></svg>
+            <p class="text-sm text-gray-600" id="upload-progress-text">正在处理…</p>
+          </div>
+        </div>
+
+        <!-- Document list -->
+        <div class="mb-3 flex items-center justify-between">
+          <h3 class="text-sm font-semibold text-gray-700">已索引文档</h3>
+          <button id="refresh-docs-btn" class="text-xs text-gray-400 hover:text-blue-600 flex items-center gap-1 transition-all">
+            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>刷新
+          </button>
+        </div>
+        <div id="docs-list" class="space-y-2"><div class="text-center text-gray-400 py-8 text-sm">加载中…</div></div>
+      </div>
+    </div>
+
     <!-- ABOUT -->
     <div id="panel-about" class="panel">
       <div class="max-w-lg mx-auto p-6">
@@ -293,11 +337,11 @@
 </div>
 
 <script>
-const S = { chatHistory:[], config:{}, skills:[], agents:[], streaming:false, modalMode:null, modalTarget:null };
+const S = { chatHistory:[], config:{}, skills:[], agents:[], docs:[], streaming:false, modalMode:null, modalTarget:null, ragEnabled:false };
 
 document.addEventListener('DOMContentLoaded', async () => {
-  bindNav(); bindChat(); bindConfig(); bindSkills(); bindAgents(); bindModal();
-  await Promise.all([loadConfig(), loadSkills(), loadAgents()]);
+  bindNav(); bindChat(); bindConfig(); bindSkills(); bindAgents(); bindModal(); bindDocs();
+  await Promise.all([loadConfig(), loadSkills(), loadAgents(), loadDocs()]);
   checkStatus(); populateAgentSelector(); populateModelSelector();
 });
 
@@ -313,6 +357,7 @@ function showPanel(name) {
   if (name === 'config') fillConfigForm();
   if (name === 'skills') renderSkills();
   if (name === 'agents') renderAgents();
+  if (name === 'docs') renderDocs();
 }
 
 // CHAT
@@ -323,6 +368,14 @@ function bindChat() {
   inp.addEventListener('keydown', e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMessage(); } });
   inp.addEventListener('input', () => { inp.style.height = 'auto'; inp.style.height = Math.min(inp.scrollHeight, 128) + 'px'; });
   document.querySelectorAll('.quick-msg').forEach(b => b.addEventListener('click', () => { document.getElementById('chat-input').value = b.dataset.msg; sendMessage(); }));
+  document.getElementById('rag-toggle-btn').addEventListener('click', () => {
+    S.ragEnabled = !S.ragEnabled;
+    const btn = document.getElementById('rag-toggle-btn');
+    const lbl = document.getElementById('rag-toggle-label');
+    if (S.ragEnabled) { btn.classList.add('active'); lbl.textContent = '知识库 开'; }
+    else { btn.classList.remove('active'); lbl.textContent = '知识库 关'; }
+    toast(S.ragEnabled ? '✅ 知识库已启用，对话将参考本地文档' : '知识库已关闭');
+  });
 }
 
 async function sendMessage() {
@@ -343,6 +396,7 @@ async function sendMessage() {
     const body = { messages: S.chatHistory.map(m => ({ role:m.role, content:m.content })) };
     if (agentId) body.agent_id = agentId;
     if (model) body.model = model;
+    if (S.ragEnabled) body.use_rag = true;
     const res = await fetch('/api/chat/', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(body) });
     if (!res.ok) { const e = await res.json(); throw new Error(e.detail || '请求失败'); }
     const ct = res.headers.get('content-type') || '';
@@ -871,6 +925,67 @@ function toast(msg, isError=false) {
   const t = document.getElementById('toast'); document.getElementById('toast-msg').textContent = msg;
   t.className = 'fixed bottom-6 right-6 z-[60] flex items-center gap-3 text-white px-4 py-3 rounded-xl shadow-lg text-sm max-w-sm ' + (isError ? 'bg-red-600' : 'bg-gray-900');
   clearTimeout(_toastTimer); _toastTimer = setTimeout(() => t.classList.add('hidden'), 3500);
+}
+
+// DOCS / KNOWLEDGE BASE
+function bindDocs() {
+  const zone = document.getElementById('drop-zone');
+  const fileInput = document.getElementById('doc-file-input');
+  document.getElementById('browse-btn').addEventListener('click', e => { e.stopPropagation(); fileInput.click(); });
+  zone.addEventListener('click', () => fileInput.click());
+  fileInput.addEventListener('change', () => { if (fileInput.files.length) uploadFiles(Array.from(fileInput.files)); fileInput.value = ''; });
+  zone.addEventListener('dragover', e => { e.preventDefault(); zone.classList.add('drag-over'); });
+  zone.addEventListener('dragleave', () => zone.classList.remove('drag-over'));
+  zone.addEventListener('drop', e => { e.preventDefault(); zone.classList.remove('drag-over'); if (e.dataTransfer.files.length) uploadFiles(Array.from(e.dataTransfer.files)); });
+  document.getElementById('refresh-docs-btn').addEventListener('click', async () => { await loadDocs(); renderDocs(); toast('✅ 已刷新'); });
+}
+
+async function loadDocs() {
+  try { const r = await fetch('/api/docs/'); if (r.ok) S.docs = (await r.json()).documents || []; } catch(e) {}
+}
+
+function renderDocs() {
+  const c = document.getElementById('docs-list');
+  if (!S.docs.length) { c.innerHTML = '<div class="text-center text-gray-400 py-8 text-sm">暂无文档，请上传文件构建知识库</div>'; return; }
+  const fmtSize = n => n < 1024 ? n + ' 字符' : n < 1024*1024 ? (n/1024).toFixed(1) + ' K 字符' : (n/1024/1024).toFixed(1) + ' M 字符';
+  const fmtDate = ts => new Date(ts * 1000).toLocaleString('zh-CN', {month:'2-digit', day:'2-digit', hour:'2-digit', minute:'2-digit'});
+  const extIcon = ext => ({'.pdf':'📄', '.docx':'📝', '.txt':'📃', '.md':'📋'}[ext] || '📎');
+  c.innerHTML = S.docs.map(d => `
+    <div class="bg-white rounded-xl border border-gray-200 p-4 shadow-sm flex items-center gap-3">
+      <span class="text-2xl flex-shrink-0">${extIcon(d.ext)}</span>
+      <div class="flex-1 min-w-0">
+        <p class="text-sm font-medium text-gray-800 truncate" title="${esc(d.filename)}">${esc(d.filename)}</p>
+        <p class="text-xs text-gray-400 mt-0.5">${fmtSize(d.char_count)} · ${d.chunk_count} 段 · ${fmtDate(d.created_at)}</p>
+      </div>
+      <span class="flex-shrink-0 text-xs px-2 py-0.5 rounded-full ${d.has_embeddings ? 'bg-green-50 text-green-600' : 'bg-yellow-50 text-yellow-600'}">${d.has_embeddings ? '已向量化' : '关键词索引'}</span>
+      <button class="doc-del-btn flex-shrink-0 text-xs text-red-500 hover:text-red-600 px-2 py-1 rounded hover:bg-red-50 transition-all" data-id="${esc(d.id)}">删除</button>
+    </div>`).join('');
+  c.querySelectorAll('.doc-del-btn').forEach(b => b.addEventListener('click', async () => {
+    if (!confirm('确定删除文档 "' + b.dataset.id.slice(0,8) + '…" 吗？')) return;
+    try { await apiDel('/api/docs/' + b.dataset.id); await loadDocs(); renderDocs(); toast('✅ 文档已删除'); } catch(e) { toast('❌ ' + e.message, true); }
+  }));
+}
+
+async function uploadFiles(files) {
+  const idle = document.getElementById('upload-idle');
+  const prog = document.getElementById('upload-progress');
+  const progText = document.getElementById('upload-progress-text');
+  idle.classList.add('hidden'); prog.classList.remove('hidden');
+  let ok = 0, fail = 0;
+  for (const file of files) {
+    progText.textContent = `正在处理 ${file.name}…`;
+    const fd = new FormData(); fd.append('file', file);
+    try {
+      const r = await fetch('/api/docs/upload', { method:'POST', body: fd });
+      if (!r.ok) { const d = await r.json().catch(() => ({})); throw new Error(d.detail || 'HTTP ' + r.status); }
+      const d = await r.json();
+      const meta = d.document;
+      toast(`✅ ${meta.filename} 已索引（${meta.chunk_count} 段${meta.has_embeddings ? '，向量化完成' : '，关键词索引'}）`);
+      ok++;
+    } catch(e) { toast(`❌ ${file.name}: ${e.message}`, true); fail++; }
+  }
+  idle.classList.remove('hidden'); prog.classList.add('hidden');
+  await loadDocs(); renderDocs();
 }
 </script>
 </body>
