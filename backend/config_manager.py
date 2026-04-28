@@ -209,11 +209,11 @@ DEFAULT_SKILLS_CONFIG = {
   "reaction": null,
   "catalyst": null,
   "electrolyte": null,
-  "reference_scale": null,
+  "reference_electrode": null,
   "metrics": {
     "overpotential_10_mA_cm2": {"value": null, "unit": "mV", "calculation": null,
                                  "original_text": null, "confidence": "high/medium/low"},
-    "tafel_slope": {"value": null, "unit": "mV dec-1", "original_text": null},
+    "tafel_slope": {"value": null, "unit": "mV dec⁻¹", "original_text": null},
     "current_density": {"value": null, "unit": null, "potential_condition": null, "original_text": null},
     "stability": {"value": null, "unit": null, "condition": null, "original_text": null}
   },
